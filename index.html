@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8"> 
+    </head>
+    <body>
+        <div id="renkon">
+            <script type="reactive">
+                const hostName = (() => {
+                    const maybeHost = new URL(window.location).searchParams.get("host")
+                    if (maybeHost) {
+                        return maybeHost;
+                    }
+                    return "/";
+                })();
+
+                const {h, render, html} = import(Renkon.spaceURL("./preact.standalone.module.js"));
+
+                const {ReflectCommands, StaticCommands} = import(`${hostName}/tool-call/js/commands.js`);
+                const {Suggester} = import(`${hostName}/tool-call/js/suggest.js`);
+
+                const commandList = new StaticCommands({
+	            "hourly": {
+		        description: "Get the weather forecast for next 24 hours in a given ZIP code.",
+		        parameters: {
+		            "zip_code": {
+			        name:        "zip_code",
+			        type:        "string",
+			        description: "The 5-digit US ZIP code.",
+		            },
+		        },
+		        returns: {
+		            "forecast": {
+			        name: "forecast",
+			        description: "The forecast for the next 24 hours.",
+		            },
+		        },
+	            },
+                });
+
+                const suggester = new Suggester(`${hostName}/tool-call/commands`, commandList);
+                const suggestion = suggester.suggest("get weather for 91607");
+                console.log(suggestion);
+            </script>
+        </div>
+        <script type="module">
+            import {view, newInspector} from "./renkon.js";
+            view({app: {newInspector}});
+        </script>
+    </body>
+</html>
