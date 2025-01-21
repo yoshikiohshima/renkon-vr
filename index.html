@@ -15,32 +15,67 @@
                 })();
 
                 const {h, render, html} = import(Renkon.spaceURL("./preact.standalone.module.js"));
+                const {ReflectCommands} = import(`${hostName}/tool-call/js/commands.js`);
 
-                const {ReflectCommands, StaticCommands} = import(`${hostName}/tool-call/js/commands.js`);
-                const {Suggester} = import(`${hostName}/tool-call/js/suggest.js`);
+                const reflectResponse = new ReflectCommands(hostName + "/").reflect();
 
-                const commandList = new StaticCommands({
-	            "hourly": {
-		        description: "Get the weather forecast for next 24 hours in a given ZIP code.",
-		        parameters: {
-		            "zip_code": {
-			        name:        "zip_code",
-			        type:        "string",
-			        description: "The 5-digit US ZIP code.",
-		            },
-		        },
-		        returns: {
-		            "forecast": {
-			        name: "forecast",
-			        description: "The forecast for the next 24 hours.",
-		            },
-		        },
-	            },
-                });
+                const commandList = [
+                    {
+                        "name": "cursor_next_line",
+                        "description": "Move the cursor to n lines down the current line",
+                        "parameters": {
+                            "nLines": {
+                                "type": "number",
+                                "description": "The amount of movement.",
+                            },
+                        },
+                        "required": ["nLines"]
+                    },
+                    {
+                        "name": "type_in",
+                        "description": "Type in the argument at the current cursor position",
+                        "parameters": {
+                            "input": {
+                                "type": "string",
+                                "description": "The string to be entered."
+                            }
+                        },
+                        "required": ["input"]
+                    }
+                ];
 
-                const suggester = new Suggester(`${hostName}/tool-call/commands`, commandList);
-                const suggestion = suggester.suggest("get weather for 91607");
-                console.log(suggestion);
+                const prompt = `
+You are an expert in identifying a function to use. You are given a question and a set of possible functions. Based on the question, you will need to make one function call to achieve the purpose.
+If none of the function can be used, point it out. If the given question lacks the parameters required by the function, also point it out.
+You should only return the function call in tools call sections.
+    
+If you decide to invoke any of the function, you MUST put it in the format of func_name1(params_value1, params_value2...)
+You SHOULD NOT include any other text in the response.
+Here is a list of functions in JSON format that you can invoke.
+`;
+
+                const input = [
+                    {role: "system", content: `${prompt}${JSON.stringify(commandList)}`},
+                    {role: "user", content:  "move the cursor 3 lines down"}
+                ]
+
+                const commandResponse = ((reflectResponse, input) => {
+                    const cmd = reflectResponse["watt-tool-8b:chat_completion"];
+                    if (!cmd) {return;}
+                    return cmd.run({messages: input});
+                })(reflectResponse, input);
+                
+                ((commandResponse) => {
+                    if (commandResponse?.choices?.[0]?.message) {
+                        console.log(commandResponse.choices[0].message);
+                        const div = document.createElement("div");
+                        div.textContent = commandResponse.choices[0].message.content;
+                        const br = document.createElement("br");
+                        const renkon = document.querySelector("#renkon");
+                        renkon.appendChild(div);
+                        renkon.appendChild(br);
+                    }
+                })(commandResponse);
             </script>
         </div>
         <script type="module">
