@@ -14,48 +14,97 @@
                     return "/";
                 })();
 
+                const {toBase64} = import("./media/toBase64.js");
+                const localMediaModule = import("./media/localmedia.js");
+                const {audioBufferToWav} = import("./media/wav.js");
+                
                 const {h, render, html} = import(Renkon.spaceURL("./preact.standalone.module.js"));
                 const {ReflectCommands} = import(`${hostName}/tool-call/js/commands.js`);
 
-                const reflectResponse = new ReflectCommands(hostName + "/tool-call").reflect();
+                const audioContext = Behaviors.keep(Events.listener(document.querySelector("#logo"), "click", (evt) => new window.AudioContext()));
+
+                const localMedia = new localMediaModule.LocalMedia({
+                    videoSource: false,
+                    onstreamchange: (stream) => {
+                    }
+                });
+
+                const streams = localMedia.setup();
+
+                const source = ((audioContext, localMedia, _streams) => {
+                    console.log("in source", audioContext, localMedia);
+                    return new window.MediaStreamAudioSourceNode(audioContext, {mediaStream: localMedia.stream})
+                })(audioContext, localMedia, streams);
+
+                const processor = ((audioContext) => {
+                    return audioContext.audioWorklet.addModule(`../media/audio-samples.js`).then(() => {
+                        const worklet = new window.AudioWorkletNode(audioContext, "processor");
+                        worklet.addEventListener("processorerror", console.log);
+                        return worklet;
+                    })
+                })(audioContext);
+
+                const inputs = Events.observe((notifier) => {
+                    processor.port.onmessage = (event) => {
+                        notifier(event.data);
+                    }
+                    source.connect(processor);
+                    return () => source.disconnect(processor);
+                }, {queued: true});
+
+                const voiceChunk = Events.receiver();
+
+                console.log("voiceChunk", voiceChunk);
+                
+                const longerBuffer = Behaviors.collect({label: 1, data: []}, inputs, (old, inputs) => {
+                    const newData = inputs.map(obj => obj.input);
+                    if (old.data.length < 1280) {
+                        old.data.push(...newData); // could be a bad idea
+                        return old;
+                    } else {
+                        const newId = old.label + 1;
+                        Events.send(voiceChunk, old);
+                        return {label: newId, data: [...newData]};
+                    }
+                });
+
+                const toolCall = new ReflectCommands(hostName + "/tool-call").reflect();
+                const root = new ReflectCommands(hostName + "/").reflect();
+                const whisper = root["faster-whisper:transcribe-data"];
 
                 const commandList = {
-                    "cursor_next_line": {
-                        "description": "Move the cursor to n lines down the current line",
-                        "parameters": {
-                            "nLines": {
-                                "type": "number",
-                                "description": "The amount of movement.",
+                    cursor_next_line: {
+                        description: "Move the cursor to n lines down the current line",
+                        meta: {
+                            "#/data/parameters/nLines": {
+                                type: "number",
+                                description: "The amount of movement.",
                             },
-                        },
-                        "returns": {
-                            "ok": {type: "boolean"}
+                            "#/data/returns/ok": {
+                                type: "boolean"
+                            },
                         }
                     },
-                    "type_in": {
-                        "description": "Type in the argument at the current cursor position",
-                        "parameters": {
-                            "input": {
-                                "type": "string",
-                                "description": "The string to be entered."
-                            }
-                        },
-                        "return": {
-                            "ok": {type: "boolean"}
+                    type_in: {
+                        description: "Type in the argument at the current cursor position",
+                        meta: {
+                            "#/data/parameters/input": {
+                                type: "string",
+                                description: "The string to be entered."
+                            },
+                            "#/data/returns/ok": {type: "boolean"}
                         }
                     }
-                }
+                };
 
-                const input = "move the cursor three lines down";
-
-                const commandResponse = ((reflectResponse, commandList, input) => {
-                    const cmd = reflectResponse["suggest"];
+                const commandResponse = ((toolCall, commandList, input) => {
+                    const cmd = toolCall["suggest"];
                     if (!cmd) {return;}
                     return cmd.run({commands: commandList, input});
-                })(reflectResponse, commandList, input);
+                })(toolCall, commandList, Events.change(input));
                 
                 ((commandResponse) => {
-                    console.log(commandResponse);
+                    console.log({commandResponse});
                     if (commandResponse?.choices[0]) {
                         const div = document.createElement("div");
                         const result = commandResponse?.choices[0];
@@ -66,8 +115,52 @@
                         renkon.appendChild(div);
                         renkon.appendChild(br);
                     }
-                    })(commandResponse);
+                })(commandResponse);
+
+                const wav = ((voiceChunk) => {
+                    const zip = (pairs) => {
+                        const length = pairs[0][0].length * pairs.length;
+                        const a = new Float32Array(length);
+                        const b = new Float32Array(length);
+                        let index = 0;
+                        for (let i = 0; i < pairs.length; i++) {
+                            a.set(pairs[i][0], index);
+                            b.set(pairs[i][1], index);
+                            index += pairs[i][0].length;
+                        }
+                        return [a, b];
+                    }
+                    return {label: voiceChunk.label, wav: audioBufferToWav(44100, zip(voiceChunk.data))};
+                })(voiceChunk);
+
+                /*
+                const wav = fetch("./wav.wav").then((data) => {
+                    return data.arrayBuffer()
+                    }).then((buffer) => ({label: 0, wav: new Uint8Array(buffer)}));
+
+                */
+                console.log("wav", wav);
+
+                const transcribed = ((wav, whisper) => {
+                    const audio_data = toBase64(new Uint8Array(wav.wav));
+                    const audio_metadata = {mime_type: "audio/wav"};
+                    const task = "transcribe";
+                    return whisper.run({audio_data, audio_metadata, task});
+                })(wav, whisper);
+                    
+                console.log("transcribed", transcribed);
+
+                const input = ((transcribed) => {
+                    const result = [];
+                    transcribed.segments.forEach((seg) => {
+                        seg.words.forEach((word) => result.push(word.word));
+                    });
+                    return result.join(" ");
+                })(transcribed);
+
+                console.log("input", input);
             </script>
+            <div id="logo">Start</div>
         </div>
         <script type="module">
             import {view, newInspector} from "./renkon.js";
