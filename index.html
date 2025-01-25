@@ -55,18 +55,31 @@
                 const voiceChunk = Events.receiver();
 
                 console.log("voiceChunk", voiceChunk);
-                
-                const longerBuffer = Behaviors.collect({label: 1, data: []}, inputs, (old, inputs) => {
-                    const newData = inputs.map(obj => obj.input);
-                    if (old.data.length < 1280) {
-                        old.data.push(...newData); // could be a bad idea
-                        return old;
-                    } else {
-                        const newId = old.label + 1;
-                        Events.send(voiceChunk, old);
-                        return {label: newId, data: [...newData]};
+
+                const speaking = Behaviors.collect({time: 0, data: [], speaking: false}, inputs, ((old, current) => {
+                    const max = Math.max(...current.map((c) => c.max));
+                    const currentTime = current[current.length - 1].currentTime;
+                    const newInput = current.map((c) => c.input);
+
+                    if (old.speaking) {
+                        const newData = [...old.data, ...newInput];
+                        if (max < 0.01) {
+                            if (currentTime > old.time + 0.5) {
+                                Events.send(voiceChunk, {time: currentTime, data: newData});
+                                return {time: currentTime, data: newData, speaking: false};
+                            }
+                            return {time: old.time, data: newData, speaking: old.speaking};
+                        }
+                        return {time: currentTime, data: newData, speaking: old.speaking};
                     }
-                });
+
+                    if (max < 0.01) {
+                        return old;
+                    }
+
+                    const newData = newInput;
+                    return {time: currentTime, data: newInput, speaking: true};
+                }));
 
                 const toolCall = new ReflectCommands(hostName + "/tool-call").reflect();
                 const root = new ReflectCommands(hostName + "/").reflect();
@@ -98,10 +111,14 @@
                 };
 
                 const commandResponse = ((toolCall, commandList, input) => {
+                    console.log("toolCall", input);
                     const cmd = toolCall["suggest"];
                     if (!cmd) {return;}
-                    return cmd.run({commands: commandList, input});
-                })(toolCall, commandList, Events.change(input));
+                    return cmd.run({commands: commandList, input}).catch((e) => {
+                        console.log("tool-call error: ", e);
+                        return;
+                    });
+                })(toolCall, commandList, input);
                 
                 ((commandResponse) => {
                     console.log({commandResponse});
@@ -130,16 +147,22 @@
                         }
                         return [a, b];
                     }
-                    return {label: voiceChunk.label, wav: audioBufferToWav(44100, zip(voiceChunk.data))};
+                    return {timelabel: voiceChunk.time, wav: audioBufferToWav(44100, zip(voiceChunk.data))};
                 })(voiceChunk);
 
-                /*
-                const wav = fetch("./wav.wav").then((data) => {
-                    return data.arrayBuffer()
-                    }).then((buffer) => ({label: 0, wav: new Uint8Array(buffer)}));
-
-                */
                 console.log("wav", wav);
+
+                /*
+                const saveWav = ((wav) => {
+                    let div = document.createElement("a");
+                    const blob = new Blob([wav.wav], {type: "audio/wav"});
+                    let fileURL = URL.createObjectURL(blob);
+                    div.setAttribute("href", fileURL);
+                    div.setAttribute("download", `wav-${Date.now()}.wav`);
+                    div.click();
+                    })(wav);
+
+               */
 
                 const transcribed = ((wav, whisper) => {
                     const audio_data = toBase64(new Uint8Array(wav.wav));
@@ -150,15 +173,17 @@
                     
                 console.log("transcribed", transcribed);
 
-                const input = ((transcribed) => {
+                const words = ((transcribed) => {
                     const result = [];
                     transcribed.segments.forEach((seg) => {
                         seg.words.forEach((word) => result.push(word.word));
                     });
                     return result.join(" ");
-                })(transcribed);
+                    })(transcribed);
 
-                console.log("input", input);
+                const input = words;
+
+                console.log("words", words);
             </script>
             <div id="logo">Start</div>
         </div>
