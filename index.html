@@ -110,25 +110,34 @@
                     }
                 };
 
-                const commandResponse = ((toolCall, commandList, input) => {
+                const commandResponseFromCommand = ((toolCall, commandList, input) => {
                     console.log("toolCall", input);
                     const cmd = toolCall["suggest"];
                     if (!cmd) {return;}
-                    return cmd.run({commands: commandList, input}).catch((e) => {
+
+                    const response = cmd.run({commands: commandList, input}).catch((e) => {
                         console.log("tool-call error: ", e);
                         return;
                     });
+                    return {response, input};
                 })(toolCall, commandList, input);
-                
+
+                const commandResponse = Events.resolvePart(commandResponseFromCommand.response, commandResponseFromCommand);
+
                 ((commandResponse) => {
-                    console.log({commandResponse});
-                    if (commandResponse?.choices[0]) {
+                    const response = commandResponse.response;
+                    if (response.choices[0]) {
+                        const input = document.createElement("div");
                         const div = document.createElement("div");
-                        const result = commandResponse?.choices[0];
+                        const result = response?.choices[0];
                         const str = `${result.command}(${Object.keys(result.parameters).map((k) => result.parameters[k])})`;
+                        input.textContent = commandResponse.input;
                         div.textContent = str;
+
+                        
                         const br = document.createElement("br");
                         const renkon = document.querySelector("#renkon");
+                        renkon.appendChild(input);
                         renkon.appendChild(div);
                         renkon.appendChild(br);
                     }
@@ -178,10 +187,10 @@
                     transcribed.segments.forEach((seg) => {
                         seg.words.forEach((word) => result.push(word.word));
                     });
-                    return result.join(" ");
+                    return result;
                     })(transcribed);
 
-                const input = words;
+                const input = words.length > 3 ? words.join(" ") : undefined;
 
                 console.log("words", words);
             </script>
