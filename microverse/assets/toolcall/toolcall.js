@@ -14,7 +14,20 @@ export function toolcall() {
     const {h, render, html} = import(Renkon.spaceURL("./preact.standalone.module.js"));
     const {ReflectCommands} = import(`${hostName}/tool-call/js/commands.js`);
 
-    const audioContext = Behaviors.keep(Events.listener(document.body, "click", (evt) => new window.AudioContext()));
+    /*
+    const trigger = Events.observe((notifier) => {
+        const handler = (event) => {
+            notifier(event);
+            document.body.removeEventListener("click", handler);
+        };
+        document.body.addEventListener("click", handler);
+        return () => document.body.removeEventListener("click", handler);
+        });
+    */
+
+    const audioContextReceiver = Events.receiver();
+
+    const audioContext = Behaviors.keep(audioContextReceiver);
 
     const localMedia = new localMediaModule.LocalMedia({
         videoSource: false,
@@ -39,6 +52,7 @@ export function toolcall() {
 
     const inputs = Events.observe((notifier) => {
         processor.port.onmessage = (event) => {
+            if (!window.toolCallDown) {return;}
             notifier(event.data);
         }
         source.connect(processor);
@@ -58,7 +72,9 @@ export function toolcall() {
             const newData = [...old.data, ...newInput];
             if (max < 0.01) {
                 if (currentTime > old.time + 0.5) {
-                    Events.send(voiceChunk, {time: currentTime, data: newData});
+                    if (window.toolCallDown) {
+                        Events.send(voiceChunk, {time: currentTime, data: newData});
+                    }
                     return {time: currentTime, data: newData, speaking: false};
                 }
                 return {time: old.time, data: newData, speaking: old.speaking};
@@ -121,8 +137,11 @@ export function toolcall() {
         const response = commandResponse.response;
         if (response.choices[0]) {
             const result = response?.choices[0];
-            const str = `${result.command}(${Object.keys(result.parameters).map((k) => result.parameters[k])})`;
-            console.log(input, str);
+            const value = {command: result.command, parameters: result.parameters};
+            if (!Renkon.myOutput) {
+                Renkon.myOutput = [];
+            }
+            Renkon.myOutput.push({input, value});
 
             /*
             const renkon = document.querySelector("#renkon");

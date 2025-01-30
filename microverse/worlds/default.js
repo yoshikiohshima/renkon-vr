@@ -21,7 +21,7 @@ export function init(Constants) {
 
     Constants.UserBehaviorDirectory = "behaviors/default";
     Constants.UserBehaviorModules = [
-        "lights.js", "toolcall.js"
+        "lights.js", "toolcall.js", "trigger.js", "textcommandInterpreter.js", "menu.js"
     ];
 
     Constants.DefaultCards = [
@@ -32,6 +32,7 @@ export function init(Constants) {
                 type: "3d",
                 singleSided: true,
                 shadow: true,
+                behaviorModules: ["ToolCallWorld", "AudioMenu"],
                 translation:[0, -1.7, 0],
                 placeholder: true,
                 placeholderSize: [400, 0.1, 400],
@@ -53,18 +54,36 @@ export function init(Constants) {
         },
         {
             card: {
+                name: "editor owner",
+                translation: [5.5, 0.4, -16.87],
+                type: "object"
+            },
+            id: "editor owner",
+        },
+        {
+            card: {
+                name: "tool call switch",
+                translation: [0, 0.5, 0],
+                behaviorModules: ["ToolCallTrigger"],
+                type: "object",
+                parent: "editor owner",
+            }
+        },
+        {
+            card: {
                 name: "text editor",
                 className: "TextFieldActor",
-                translation: [5.5, 0.4, -16.87],
+                parent: "editor owner",
+                translation: [0, -0.5, 0],
                 rotation: [0, 0, 0],
                 depth: 0.05,
                 type: "text",
-                runs: [{text: "\nWelcome to the Croquet Gallery!\n"}],
+                runs: [{text: "\nWelcome to the Croquet Gallery!\nThis is connected to the substrate OS\nthat can detect voice commands.\nIt can handle move the cursor down for example"}],
                 margins: {left: 20, top: 20, right: 20, bottom: 20},
                 backgroundColor: 0xc4a836,
                 color: 0x000000,
                 fullBright: true,
-                behaviorModules: ["ToolCall"],
+                behaviorModules: ["TextCommandInterpreter"],
                 //color: 0xf4e056,
                 width: 2,
                 height: 2,
