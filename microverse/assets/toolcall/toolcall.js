@@ -91,8 +91,8 @@ export function toolcall() {
     }));
 
     const toolCall = new ReflectCommands(hostName + "/tool-call").reflect();
-    const root = new ReflectCommands(hostName + "/").reflect();
-    const whisper = root["faster-whisper:transcribe-data"];
+    const root = new ReflectCommands(hostName + "/substrate/v1/msgindex").reflect();
+    const whisper = root["faster-whisper/transcribe-data"];
 
     const commandList = {
         cursor_next_line: {

@@ -21,7 +21,7 @@ export function init(Constants) {
 
     Constants.UserBehaviorDirectory = "behaviors/default";
     Constants.UserBehaviorModules = [
-        "lights.js", "toolcall.js", "trigger.js", "textcommandInterpreter.js", "menu.js"
+        "lights.js", "toolcall.js", "trigger.js", "textCommandInterpreter.js", "menu.js"
     ];
 
     Constants.DefaultCards = [

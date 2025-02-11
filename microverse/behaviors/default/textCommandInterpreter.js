@@ -10,10 +10,12 @@ import {ActorBehavior} from "../PrototypeBehavior";
 class TextCommandInterpreterPawn extends PawnBehavior {
     setup() {
         this.subscribe(this.id, "editCommand", "editCommand");
+        console.log("TextCommandInterpreterPawn");
     }
 
     editCommand(data) {
         let command = data.value;
+        console.log("foooooooooo");
         if (!command) return;
 
         let user = this.user;
@@ -22,8 +24,12 @@ class TextCommandInterpreterPawn extends PawnBehavior {
             let nLines = command.parameters["nLines"];
             for (let i = 0; i < nLines; i++) {
                 this.warota.handleKey(user, 40, false, false);
+                this.warota.layout();
             }
             this.changed(true); // you can call changed of TextFieldPawn
+        }
+        if (command.command === "type_in") {
+            this.warota
         }
     }
 }
