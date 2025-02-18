@@ -1144,7 +1144,7 @@ export class Warota {
         this.delete(user, true);
     }
 
-    handleKey(user, key, selecting, ctrlKey) {
+    handleKey(user, key, selecting, ctrlKey, keyCount = 1) {
         let selection = this.doc.selections[user.id] || {start: 0, end: 0, color: user.color};
         let {start, end, isBol} = selection;
         let length = this.doc.length();
@@ -1183,8 +1183,10 @@ export class Warota {
                 if (!selecting && start !== end) {
                     pos = start;
                 } else {
-                    if (pos > 0) {
-                        pos--;
+                    for (let count = 0; count < keyCount; count++) {
+                        if (pos > 0) {
+                            pos--;
+                        }
                     }
                 }
                 isBol = false;
@@ -1194,11 +1196,13 @@ export class Warota {
                 if (!selecting && start !== end) {
                     pos = end;
                 } else {
-                    if (pos < length) {
-                        let [line, lineIndex] = this.findLine(pos);
-                        wasLine = line;
-                        wasLineIndex = lineIndex;
-                        pos++;
+                    for (let count = 0; count < keyCount; count++) {
+                        if (pos < length) {
+                            let [line, lineIndex] = this.findLine(pos);
+                            wasLine = line;
+                            wasLineIndex = lineIndex;
+                            pos++;
+                        }
                     }
                 }
                 changingCaret = true;
@@ -1206,18 +1210,22 @@ export class Warota {
 
             case 40: // down arrow - find character below
                 {
-                    let [line, lineIndex] = this.findLine(pos);
-                    wasLine = line;
-                    wasLineIndex = lineIndex;
-                    pos = this.changeLine(user, pos, 1);
-                    downEnd = oldPos === pos;
-                    changingCaret = true;
+                    for (let count = 0; count < keyCount; count++) {
+                        let [line, lineIndex] = this.findLine(pos);
+                        wasLine = line;
+                        wasLineIndex = lineIndex;
+                        pos = this.changeLine(user, pos, 1);
+                        downEnd = oldPos === pos;
+                        changingCaret = true;
+                    }
                 }
                 break;
             case 38: // up - find character above
-                pos = this.changeLine(user, pos, -1);
-                isBol = false;
-                changingCaret = true;
+                for (let count = 0; count < keyCount; count++) {
+                    pos = this.changeLine(user, pos, -1);
+                    isBol = false;
+                    changingCaret = true;
+                }
                 break;
 
             case 8: // backspace
