@@ -22,12 +22,11 @@ class TextCommandInterpreterPawn extends PawnBehavior {
         if (command.command === "cursor_next_line") {
             let nLines = command.parameters["nLines"];
             this.warota.handleKey(user, 40, false, false, nLines);
-            this.warota.layout();
-
-            this.changed(true); // you can call changed of TextFieldPawn
+            this.changed(true); // this calls "changed" of TextFieldPawn
         }
         if (command.command === "type_in") {
-            this.warota
+            this.warota.insert(user, [{text: command.parameters["input"]}]);
+            this.changed(true); // this calls "changed" of TextFieldPawn
         }
     }
 }

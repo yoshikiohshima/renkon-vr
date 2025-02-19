@@ -134,7 +134,9 @@ export function toolcall() {
     const commandResponse = Events.resolvePart(commandResponseFromCommand.response, commandResponseFromCommand);
 
     ((commandResponse) => {
+        console.log("commandResponse", commandResponse);
         const response = commandResponse.response;
+        if (!response) {return;}
         if (response.choices[0]) {
             const result = response?.choices[0];
             const value = {command: result.command, parameters: result.parameters};
@@ -203,7 +205,8 @@ export function toolcall() {
         return result;
     })(transcribed);
 
-    const input = words.length > 3 ? words.join(" ") : undefined;
+    const input = words.join(" ");
     console.log("words", words);
+    console.log("input", input);
     return [];
 }

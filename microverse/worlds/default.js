@@ -55,7 +55,7 @@ export function init(Constants) {
         {
             card: {
                 name: "editor owner",
-                translation: [5.5, 0.4, -16.87],
+                translation: [0, 0.4, -2.5],
                 type: "object"
             },
             id: "editor owner",
