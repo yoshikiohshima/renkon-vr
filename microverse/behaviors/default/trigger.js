@@ -13,6 +13,33 @@ class ToolCallWorldPawn extends PawnBehavior {
         this.subscribe(this.id, "startAudioContext", "startAudioContext");
     }
 
+    commandList() {
+        return {
+            cursor_next_line: {
+                description: "Move the cursor to n lines down the current line",
+                meta: {
+                    "#/data/parameters/nLines": {
+                        type: "number",
+                        description: "The amount of movement.",
+                    },
+                    "#/data/returns/ok": {
+                        type: "boolean"
+                    },
+                }
+            },
+            type_in: {
+                description: "Type in the argument at the current cursor position",
+                meta: {
+                    "#/data/parameters/input": {
+                        type: "string",
+                        description: "The string to be entered."
+                    },
+                    "#/data/returns/ok": {type: "boolean"}
+                }
+            }
+        };
+    }
+
     startAudioContext(audioContext) {
         if (!window.renkonPromise) {
             window.renkonPromise = import("/assets/toolcall/renkon-core.js");
@@ -23,6 +50,8 @@ class ToolCallWorldPawn extends PawnBehavior {
             import("/assets/toolcall/toolcall.js").then((toolcall) => {
                 this.programState.merge(toolcall.toolcall);
                 this.programState.registerEvent("audioContextReceiver", audioContext);
+                this.programState.registerEvent("commandListReceiver", this.commandList());
+
                 this.startTime = Date.now();
                 this.lastTime = this.startTime;
                 let moduleName = this._behavior.module.externalName;

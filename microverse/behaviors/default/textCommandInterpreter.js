@@ -28,6 +28,10 @@ class TextCommandInterpreterPawn extends PawnBehavior {
             this.warota.insert(user, [{text: command.parameters["input"]}]);
             this.changed(true); // this calls "changed" of TextFieldPawn
         }
+        if (command.command === "insert") {
+            this.warota.insert(user, [{text: command.parameters["input"]}]);
+            this.changed(true); // this calls "changed" of TextFieldPawn
+        }
     }
 }
 

@@ -94,30 +94,11 @@ export function toolcall() {
     const root = new ReflectCommands(hostName + "/substrate/v1/msgindex").reflect();
     const whisper = root["faster-whisper/transcribe-data"];
 
-    const commandList = {
-        cursor_next_line: {
-            description: "Move the cursor to n lines down the current line",
-            meta: {
-                "#/data/parameters/nLines": {
-                    type: "number",
-                    description: "The amount of movement.",
-                },
-                "#/data/returns/ok": {
-                    type: "boolean"
-                },
-            }
-        },
-        type_in: {
-            description: "Type in the argument at the current cursor position",
-            meta: {
-                "#/data/parameters/input": {
-                    type: "string",
-                    description: "The string to be entered."
-                },
-                "#/data/returns/ok": {type: "boolean"}
-            }
-        }
-    };
+    const commandListReceiver = Events.receiver();
+
+    const commandList = Behaviors.keep(commandListReceiver);
+
+    console.log("commandList", commandList);
 
     const commandResponseFromCommand = ((toolCall, commandList, input) => {
         console.log("toolCall", input);
@@ -134,7 +115,7 @@ export function toolcall() {
     const commandResponse = Events.resolvePart(commandResponseFromCommand.response, commandResponseFromCommand);
 
     ((commandResponse) => {
-        console.log("commandResponse", commandResponse);
+        console.log("processing commandResponse", commandResponse);
         const response = commandResponse.response;
         if (!response) {return;}
         if (response.choices[0]) {
@@ -143,7 +124,7 @@ export function toolcall() {
             if (!Renkon.myOutput) {
                 Renkon.myOutput = [];
             }
-            Renkon.myOutput.push({input, value});
+            Renkon.myOutput.push({input: commandResponse.input, value});
 
             /*
             const renkon = document.querySelector("#renkon");
@@ -205,7 +186,7 @@ export function toolcall() {
         return result;
     })(transcribed);
 
-    const input = words.join(" ");
+    const input = Events.change(words.join(" "));
     console.log("words", words);
     console.log("input", input);
     return [];
