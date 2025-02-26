@@ -16,7 +16,7 @@ class ToolCallWorldPawn extends PawnBehavior {
     commandList() {
         return {
             cursor_next_line: {
-                description: "Move the cursor to n lines down the current line",
+                description: "Move the cursor to n lines down from the current line",
                 meta: {
                     "#/data/parameters/nLines": {
                         type: "number",
@@ -47,6 +47,7 @@ class ToolCallWorldPawn extends PawnBehavior {
         window.renkonPromise.then((renkon) => {
             this.renkon = renkon;
             this.programState = new renkon.ProgramState(0);
+            window.programState = this.programState;
             import("/assets/toolcall/toolcall.js").then((toolcall) => {
                 this.programState.merge(toolcall.toolcall);
                 this.programState.registerEvent("audioContextReceiver", audioContext);
@@ -73,7 +74,7 @@ class ToolCallWorldPawn extends PawnBehavior {
         if (now - this.lastTime < 16) {return;}
         try {
             this.programState.evaluate(now - this.startTime);
-            if (this.programState.myOutput.length > 0) {
+            if (this.programState.myOutput && this.programState.myOutput.length > 0) {
                 this.output.push(...this.programState.myOutput);
                 this.programState.myOutput = [];
                 if (this.toolCallTarget) {
@@ -83,6 +84,8 @@ class ToolCallWorldPawn extends PawnBehavior {
                 }
             }
         } catch(e) {
+            console.log("error in renkon program execution");
+            console.error(e);
         }
 
         this.lastTime = now;

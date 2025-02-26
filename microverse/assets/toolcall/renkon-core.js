@@ -97,15 +97,15 @@ var TokenType = function TokenType2(label, conf) {
   this.binop = conf.binop || null;
   this.updateContext = null;
 };
-function binop(name, prec) {
-  return new TokenType(name, { beforeExpr: true, binop: prec });
+function binop(name2, prec) {
+  return new TokenType(name2, { beforeExpr: true, binop: prec });
 }
 var beforeExpr = { beforeExpr: true }, startsExpr = { startsExpr: true };
 var keywords = {};
-function kw(name, options) {
+function kw(name2, options) {
   if (options === void 0) options = {};
-  options.keyword = name;
-  return keywords[name] = new TokenType(name, options);
+  options.keyword = name2;
+  return keywords[name2] = new TokenType(name2, options);
 }
 var types$1 = {
   num: new TokenType("num", startsExpr),
@@ -560,26 +560,26 @@ pp$9.strictDirective = function(start) {
     }
   }
 };
-pp$9.eat = function(type) {
-  if (this.type === type) {
+pp$9.eat = function(type2) {
+  if (this.type === type2) {
     this.next();
     return true;
   } else {
     return false;
   }
 };
-pp$9.isContextual = function(name) {
-  return this.type === types$1.name && this.value === name && !this.containsEsc;
+pp$9.isContextual = function(name2) {
+  return this.type === types$1.name && this.value === name2 && !this.containsEsc;
 };
-pp$9.eatContextual = function(name) {
-  if (!this.isContextual(name)) {
+pp$9.eatContextual = function(name2) {
+  if (!this.isContextual(name2)) {
     return false;
   }
   this.next();
   return true;
 };
-pp$9.expectContextual = function(name) {
-  if (!this.eatContextual(name)) {
+pp$9.expectContextual = function(name2) {
+  if (!this.eatContextual(name2)) {
     this.unexpected();
   }
 };
@@ -610,8 +610,8 @@ pp$9.afterTrailingComma = function(tokType, notNext) {
     return true;
   }
 };
-pp$9.expect = function(type) {
-  this.eat(type) || this.unexpected();
+pp$9.expect = function(type2) {
+  this.eat(type2) || this.unexpected();
 };
 pp$9.unexpected = function(pos) {
   this.raise(pos != null ? pos : this.start, "Unexpected token");
@@ -673,8 +673,8 @@ pp$8.parseTopLevel = function(node) {
   }
   if (this.inModule) {
     for (var i2 = 0, list2 = Object.keys(this.undefinedExports); i2 < list2.length; i2 += 1) {
-      var name = list2[i2];
-      this.raiseRecoverable(this.undefinedExports[name].start, "Export '" + name + "' is not defined");
+      var name2 = list2[i2];
+      this.raiseRecoverable(this.undefinedExports[name2].start, "Export '" + name2 + "' is not defined");
     }
   }
   this.adaptDirectivePrologue(node.body);
@@ -1409,26 +1409,26 @@ pp$8.exitClassBody = function() {
   }
 };
 function isPrivateNameConflicted(privateNameMap, element) {
-  var name = element.key.name;
-  var curr = privateNameMap[name];
+  var name2 = element.key.name;
+  var curr = privateNameMap[name2];
   var next = "true";
   if (element.type === "MethodDefinition" && (element.kind === "get" || element.kind === "set")) {
     next = (element.static ? "s" : "i") + element.kind;
   }
   if (curr === "iget" && next === "iset" || curr === "iset" && next === "iget" || curr === "sget" && next === "sset" || curr === "sset" && next === "sget") {
-    privateNameMap[name] = "true";
+    privateNameMap[name2] = "true";
     return false;
   } else if (!curr) {
-    privateNameMap[name] = next;
+    privateNameMap[name2] = next;
     return false;
   } else {
     return true;
   }
 }
-function checkKeyName(node, name) {
+function checkKeyName(node, name2) {
   var computed = node.computed;
   var key = node.key;
-  return !computed && (key.type === "Identifier" && key.name === name || key.type === "Literal" && key.value === name);
+  return !computed && (key.type === "Identifier" && key.name === name2 || key.type === "Literal" && key.value === name2);
 }
 pp$8.parseExportAllDeclaration = function(node, exports) {
   if (this.options.ecmaVersion >= 11) {
@@ -1516,39 +1516,39 @@ pp$8.parseExportDefaultDeclaration = function() {
     return declaration;
   }
 };
-pp$8.checkExport = function(exports, name, pos) {
+pp$8.checkExport = function(exports, name2, pos) {
   if (!exports) {
     return;
   }
-  if (typeof name !== "string") {
-    name = name.type === "Identifier" ? name.name : name.value;
+  if (typeof name2 !== "string") {
+    name2 = name2.type === "Identifier" ? name2.name : name2.value;
   }
-  if (hasOwn(exports, name)) {
-    this.raiseRecoverable(pos, "Duplicate export '" + name + "'");
+  if (hasOwn(exports, name2)) {
+    this.raiseRecoverable(pos, "Duplicate export '" + name2 + "'");
   }
-  exports[name] = true;
+  exports[name2] = true;
 };
 pp$8.checkPatternExport = function(exports, pat) {
-  var type = pat.type;
-  if (type === "Identifier") {
+  var type2 = pat.type;
+  if (type2 === "Identifier") {
     this.checkExport(exports, pat, pat.start);
-  } else if (type === "ObjectPattern") {
+  } else if (type2 === "ObjectPattern") {
     for (var i2 = 0, list2 = pat.properties; i2 < list2.length; i2 += 1) {
       var prop = list2[i2];
       this.checkPatternExport(exports, prop);
     }
-  } else if (type === "ArrayPattern") {
+  } else if (type2 === "ArrayPattern") {
     for (var i$1 = 0, list$1 = pat.elements; i$1 < list$1.length; i$1 += 1) {
       var elt = list$1[i$1];
       if (elt) {
         this.checkPatternExport(exports, elt);
       }
     }
-  } else if (type === "Property") {
+  } else if (type2 === "Property") {
     this.checkPatternExport(exports, pat.value);
-  } else if (type === "AssignmentPattern") {
+  } else if (type2 === "AssignmentPattern") {
     this.checkPatternExport(exports, pat.left);
-  } else if (type === "RestElement") {
+  } else if (type2 === "RestElement") {
     this.checkPatternExport(exports, pat.argument);
   }
 };
@@ -2015,13 +2015,13 @@ pp$6.inGeneratorContext = function() {
   return false;
 };
 pp$6.updateContext = function(prevType) {
-  var update, type = this.type;
-  if (type.keyword && prevType === types$1.dot) {
+  var update, type2 = this.type;
+  if (type2.keyword && prevType === types$1.dot) {
     this.exprAllowed = false;
-  } else if (update = type.updateContext) {
+  } else if (update = type2.updateContext) {
     update.call(this, prevType);
   } else {
-    this.exprAllowed = type.beforeExpr;
+    this.exprAllowed = type2.beforeExpr;
   }
 };
 pp$6.overrideContext = function(tokenCtx) {
@@ -2106,20 +2106,20 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
     return;
   }
   var key = prop.key;
-  var name;
+  var name2;
   switch (key.type) {
     case "Identifier":
-      name = key.name;
+      name2 = key.name;
       break;
     case "Literal":
-      name = String(key.value);
+      name2 = String(key.value);
       break;
     default:
       return;
   }
   var kind = prop.kind;
   if (this.options.ecmaVersion >= 6) {
-    if (name === "__proto__" && kind === "init") {
+    if (name2 === "__proto__" && kind === "init") {
       if (propHash.proto) {
         if (refDestructuringErrors) {
           if (refDestructuringErrors.doubleProto < 0) {
@@ -2133,8 +2133,8 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
     }
     return;
   }
-  name = "$" + name;
-  var other = propHash[name];
+  name2 = "$" + name2;
+  var other = propHash[name2];
   if (other) {
     var redefinition;
     if (kind === "init") {
@@ -2146,7 +2146,7 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
       this.raiseRecoverable(key.start, "Redefinition of property");
     }
   } else {
-    other = propHash[name] = {
+    other = propHash[name2] = {
       init: false,
       get: false,
       set: false
@@ -3046,31 +3046,31 @@ pp$5.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestruct
 pp$5.checkUnreserved = function(ref2) {
   var start = ref2.start;
   var end = ref2.end;
-  var name = ref2.name;
-  if (this.inGenerator && name === "yield") {
+  var name2 = ref2.name;
+  if (this.inGenerator && name2 === "yield") {
     this.raiseRecoverable(start, "Cannot use 'yield' as identifier inside a generator");
   }
-  if (this.inAsync && name === "await") {
+  if (this.inAsync && name2 === "await") {
     this.raiseRecoverable(start, "Cannot use 'await' as identifier inside an async function");
   }
-  if (this.currentThisScope().inClassFieldInit && name === "arguments") {
+  if (this.currentThisScope().inClassFieldInit && name2 === "arguments") {
     this.raiseRecoverable(start, "Cannot use 'arguments' in class field initializer");
   }
-  if (this.inClassStaticBlock && (name === "arguments" || name === "await")) {
-    this.raise(start, "Cannot use " + name + " in class static initialization block");
+  if (this.inClassStaticBlock && (name2 === "arguments" || name2 === "await")) {
+    this.raise(start, "Cannot use " + name2 + " in class static initialization block");
   }
-  if (this.keywords.test(name)) {
-    this.raise(start, "Unexpected keyword '" + name + "'");
+  if (this.keywords.test(name2)) {
+    this.raise(start, "Unexpected keyword '" + name2 + "'");
   }
   if (this.options.ecmaVersion < 6 && this.input.slice(start, end).indexOf("\\") !== -1) {
     return;
   }
   var re = this.strict ? this.reservedWordsStrict : this.reservedWords;
-  if (re.test(name)) {
-    if (!this.inAsync && name === "await") {
+  if (re.test(name2)) {
+    if (!this.inAsync && name2 === "await") {
       this.raiseRecoverable(start, "Cannot use keyword 'await' outside an async function");
     }
-    this.raiseRecoverable(start, "The keyword '" + name + "' is reserved");
+    this.raiseRecoverable(start, "The keyword '" + name2 + "' is reserved");
   }
 };
 pp$5.parseIdent = function(liberal) {
@@ -3175,36 +3175,36 @@ pp$3.exitScope = function() {
 pp$3.treatFunctionsAsVarInScope = function(scope) {
   return scope.flags & SCOPE_FUNCTION || !this.inModule && scope.flags & SCOPE_TOP;
 };
-pp$3.declareName = function(name, bindingType, pos) {
+pp$3.declareName = function(name2, bindingType, pos) {
   var redeclared = false;
   if (bindingType === BIND_LEXICAL) {
     var scope = this.currentScope();
-    redeclared = scope.lexical.indexOf(name) > -1 || scope.functions.indexOf(name) > -1 || scope.var.indexOf(name) > -1;
-    scope.lexical.push(name);
+    redeclared = scope.lexical.indexOf(name2) > -1 || scope.functions.indexOf(name2) > -1 || scope.var.indexOf(name2) > -1;
+    scope.lexical.push(name2);
     if (this.inModule && scope.flags & SCOPE_TOP) {
-      delete this.undefinedExports[name];
+      delete this.undefinedExports[name2];
     }
   } else if (bindingType === BIND_SIMPLE_CATCH) {
     var scope$1 = this.currentScope();
-    scope$1.lexical.push(name);
+    scope$1.lexical.push(name2);
   } else if (bindingType === BIND_FUNCTION) {
     var scope$2 = this.currentScope();
     if (this.treatFunctionsAsVar) {
-      redeclared = scope$2.lexical.indexOf(name) > -1;
+      redeclared = scope$2.lexical.indexOf(name2) > -1;
     } else {
-      redeclared = scope$2.lexical.indexOf(name) > -1 || scope$2.var.indexOf(name) > -1;
+      redeclared = scope$2.lexical.indexOf(name2) > -1 || scope$2.var.indexOf(name2) > -1;
     }
-    scope$2.functions.push(name);
+    scope$2.functions.push(name2);
   } else {
     for (var i2 = this.scopeStack.length - 1; i2 >= 0; --i2) {
       var scope$3 = this.scopeStack[i2];
-      if (scope$3.lexical.indexOf(name) > -1 && !(scope$3.flags & SCOPE_SIMPLE_CATCH && scope$3.lexical[0] === name) || !this.treatFunctionsAsVarInScope(scope$3) && scope$3.functions.indexOf(name) > -1) {
+      if (scope$3.lexical.indexOf(name2) > -1 && !(scope$3.flags & SCOPE_SIMPLE_CATCH && scope$3.lexical[0] === name2) || !this.treatFunctionsAsVarInScope(scope$3) && scope$3.functions.indexOf(name2) > -1) {
         redeclared = true;
         break;
       }
-      scope$3.var.push(name);
+      scope$3.var.push(name2);
       if (this.inModule && scope$3.flags & SCOPE_TOP) {
-        delete this.undefinedExports[name];
+        delete this.undefinedExports[name2];
       }
       if (scope$3.flags & SCOPE_VAR) {
         break;
@@ -3212,7 +3212,7 @@ pp$3.declareName = function(name, bindingType, pos) {
     }
   }
   if (redeclared) {
-    this.raiseRecoverable(pos, "Identifier '" + name + "' has already been declared");
+    this.raiseRecoverable(pos, "Identifier '" + name2 + "' has already been declared");
   }
 };
 pp$3.checkLocalExport = function(id) {
@@ -3260,8 +3260,8 @@ pp$2.startNode = function() {
 pp$2.startNodeAt = function(pos, loc) {
   return new Node(this, pos, loc);
 };
-function finishNodeAt(node, type, pos, loc) {
-  node.type = type;
+function finishNodeAt(node, type2, pos, loc) {
+  node.type = type2;
   node.end = pos;
   if (this.options.locations) {
     node.loc.end = loc;
@@ -3271,11 +3271,11 @@ function finishNodeAt(node, type, pos, loc) {
   }
   return node;
 }
-pp$2.finishNode = function(node, type) {
-  return finishNodeAt.call(this, node, type, this.lastTokEnd, this.lastTokEndLoc);
+pp$2.finishNode = function(node, type2) {
+  return finishNodeAt.call(this, node, type2, this.lastTokEnd, this.lastTokEndLoc);
 };
-pp$2.finishNodeAt = function(node, type, pos, loc) {
-  return finishNodeAt.call(this, node, type, pos, loc);
+pp$2.finishNodeAt = function(node, type2, pos, loc) {
+  return finishNodeAt.call(this, node, type2, pos, loc);
 };
 pp$2.copyNode = function(node) {
   var newNode = new Node(this, node.start, this.startLoc);
@@ -3529,8 +3529,8 @@ pp$1.regexp_pattern = function(state) {
     state.raise("Invalid escape");
   }
   for (var i2 = 0, list2 = state.backReferenceNames; i2 < list2.length; i2 += 1) {
-    var name = list2[i2];
-    if (!state.groupNames[name]) {
+    var name2 = list2[i2];
+    if (!state.groupNames[name2]) {
       state.raise("Invalid named capture referenced");
     }
   }
@@ -4169,10 +4169,10 @@ pp$1.regexp_eatUnicodePropertyValueExpression = function(state) {
     61
     /* = */
   )) {
-    var name = state.lastStringValue;
+    var name2 = state.lastStringValue;
     if (this.regexp_eatUnicodePropertyValue(state)) {
       var value = state.lastStringValue;
-      this.regexp_validateUnicodePropertyNameAndValue(state, name, value);
+      this.regexp_validateUnicodePropertyNameAndValue(state, name2, value);
       return CharSetOk;
     }
   }
@@ -4183,11 +4183,11 @@ pp$1.regexp_eatUnicodePropertyValueExpression = function(state) {
   }
   return CharSetNone;
 };
-pp$1.regexp_validateUnicodePropertyNameAndValue = function(state, name, value) {
-  if (!hasOwn(state.unicodeProperties.nonBinary, name)) {
+pp$1.regexp_validateUnicodePropertyNameAndValue = function(state, name2, value) {
+  if (!hasOwn(state.unicodeProperties.nonBinary, name2)) {
     state.raise("Invalid property name");
   }
-  if (!state.unicodeProperties.nonBinary[name].test(value)) {
+  if (!state.unicodeProperties.nonBinary[name2].test(value)) {
     state.raise("Invalid property value");
   }
 };
@@ -4794,13 +4794,13 @@ pp.skipSpace = function() {
     }
   }
 };
-pp.finishToken = function(type, val) {
+pp.finishToken = function(type2, val) {
   this.end = this.pos;
   if (this.options.locations) {
     this.endLoc = this.curPosition();
   }
   var prevType = this.type;
-  this.type = type;
+  this.type = type2;
   this.value = val;
   this.updateContext(prevType);
 };
@@ -5037,10 +5037,10 @@ pp.getTokenFromCode = function(code) {
   }
   this.raise(this.pos, "Unexpected character '" + codePointToString(code) + "'");
 };
-pp.finishOp = function(type, size) {
+pp.finishOp = function(type2, size) {
   var str = this.input.slice(this.pos, this.pos + size);
   this.pos += size;
-  return this.finishToken(type, str);
+  return this.finishToken(type2, str);
 };
 pp.readRegexp = function() {
   var escaped, inClass, start = this.pos;
@@ -5452,16 +5452,16 @@ pp.readWord1 = function() {
 };
 pp.readWord = function() {
   var word = this.readWord1();
-  var type = types$1.name;
+  var type2 = types$1.name;
   if (this.keywords.test(word)) {
-    type = keywords[word];
+    type2 = keywords[word];
   }
-  return this.finishToken(type, word);
+  return this.finishToken(type2, word);
 };
-var version = "8.14.0";
+var version$2 = "8.14.0";
 Parser.acorn = {
   Parser,
-  version,
+  version: version$2,
   defaultOptions,
   Position,
   SourceLocation,
@@ -5512,7 +5512,7 @@ const t = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   tokContexts: types,
   tokTypes: types$1,
   tokenizer,
-  version
+  version: version$2
 }, Symbol.toStringTag, { value: "Module" }));
 function getDefaultExportFromCjs(x2) {
   return x2 && x2.__esModule && Object.prototype.hasOwnProperty.call(x2, "default") ? x2["default"] : x2;
@@ -6025,10 +6025,10 @@ const require$$1 = /* @__PURE__ */ getAugmentedNamespace(t);
       // Parse namespaced identifier.
       jsx_parseNamespacedName() {
         let startPos = this.start, startLoc = this.startLoc;
-        let name = this.jsx_parseIdentifier();
-        if (!options.allowNamespaces || !this.eat(tt.colon)) return name;
+        let name2 = this.jsx_parseIdentifier();
+        if (!options.allowNamespaces || !this.eat(tt.colon)) return name2;
         var node = this.startNodeAt(startPos, startLoc);
-        node.namespace = name;
+        node.namespace = name2;
         node.name = this.jsx_parseIdentifier();
         return this.finishNode(node, "JSXNamespacedName");
       }
@@ -6221,10 +6221,10 @@ function simple(node, visitors, baseVisitor, state, override) {
     baseVisitor = base;
   }
   (function c2(node2, st, override2) {
-    var type = override2 || node2.type;
-    baseVisitor[type](node2, st, c2);
-    if (visitors[type]) {
-      visitors[type](node2, st);
+    var type2 = override2 || node2.type;
+    baseVisitor[type2](node2, st, c2);
+    if (visitors[type2]) {
+      visitors[type2](node2, st);
     }
   })(node, state, override);
 }
@@ -6234,14 +6234,14 @@ function ancestor(node, visitors, baseVisitor, state, override) {
     baseVisitor = base;
   }
   (function c2(node2, st, override2) {
-    var type = override2 || node2.type;
+    var type2 = override2 || node2.type;
     var isNew = node2 !== ancestors[ancestors.length - 1];
     if (isNew) {
       ancestors.push(node2);
     }
-    baseVisitor[type](node2, st, c2);
-    if (visitors[type]) {
-      visitors[type](node2, st || ancestors, ancestors);
+    baseVisitor[type2](node2, st, c2);
+    if (visitors[type2]) {
+      visitors[type2](node2, st || ancestors, ancestors);
     }
     if (isNew) {
       ancestors.pop();
@@ -6706,9 +6706,9 @@ function findReferences(node, {
   const locals = /* @__PURE__ */ new Map();
   const references = [];
   const sendTarget = [];
-  function hasLocal(node2, name) {
+  function hasLocal(node2, name2) {
     const l2 = locals.get(node2);
-    return l2 ? l2.has(name) : false;
+    return l2 ? l2.has(name2) : false;
   }
   function declareLocal(node2, id) {
     if (!filterDeclaration(id)) return;
@@ -6797,14 +6797,14 @@ function findReferences(node, {
     }
   });
   function identifier(node2, _state, parents) {
-    const name = node2.name;
-    if (name === "undefined") return;
+    const name2 = node2.name;
+    if (name2 === "undefined") return;
     for (let i2 = parents.length - 2; i2 >= 0; --i2) {
-      if (hasLocal(parents[i2], name)) {
+      if (hasLocal(parents[i2], name2)) {
         return;
       }
     }
-    if (!globals.has(name)) {
+    if (!globals.has(name2)) {
       references.push(node2);
     }
   }
@@ -7161,6 +7161,42 @@ function rewriteRenkonCalls(output, body) {
     }
   });
 }
+const name = "renkon-core";
+const version$1 = "0.2.10";
+const type = "module";
+const license = "MIT";
+const files = [
+  "dist"
+];
+const main = "dist/renkon-core.js";
+const scripts = {
+  vite: "vite",
+  build: "vite build",
+  prepublish: "npm run build"
+};
+const devDependencies = {
+  "@typescript-eslint/eslint-plugin": "^7.11.0",
+  "@typescript-eslint/parser": "^7.11.0",
+  "npm-run-all": "^4.1.5",
+  vite: "^5.2.0"
+};
+const dependencies = {
+  acorn: "^8.11.3",
+  "acorn-jsx": "^5.3.2",
+  "acorn-typescript": "^1.4.13",
+  "acorn-walk": "^8.3.2"
+};
+const packageJson = {
+  name,
+  version: version$1,
+  type,
+  license,
+  files,
+  main,
+  scripts,
+  devDependencies,
+  dependencies
+};
 const typeKey = Symbol("typeKey");
 const isBehaviorKey = Symbol("isBehavior");
 const eventType = "EventType";
@@ -7177,10 +7213,10 @@ const generatorNextType = "GeneratorNextType";
 const resolvePartType = "ResolvePart";
 _b = typeKey, _a = isBehaviorKey;
 class Stream {
-  constructor(type, isBehavior) {
+  constructor(type2, isBehavior) {
     __publicField(this, _b);
     __publicField(this, _a);
-    this[typeKey] = type;
+    this[typeKey] = type2;
     this[isBehaviorKey] = isBehavior;
   }
   created(_state, _id) {
@@ -7524,38 +7560,54 @@ class CollectStream extends Stream {
   }
 }
 class ResolvePart extends Stream {
-  constructor(promise, object, isBehavior) {
+  constructor(object, isBehavior) {
     super(resolvePartType, isBehavior);
     __publicField(this, "promise");
+    __publicField(this, "indices");
     __publicField(this, "resolved");
     __publicField(this, "object");
-    this.promise = promise;
     this.object = object;
-    this.resolved = !(typeof this.promise === "object" && this.promise.then);
+    if (Array.isArray(this.object)) {
+      const array = this.object;
+      const indices = [...Array(array.length).keys()].filter((i2) => {
+        const elem = this.object[i2];
+        return typeof elem === "object" && elem !== null && elem.then;
+      });
+      const promises = indices.map((i2) => array[i2]);
+      this.promise = Promise.all(promises);
+      this.indices = indices;
+    } else {
+      const keys = Object.keys(this.object).filter((k2) => {
+        const elem = this.object[k2];
+        return typeof elem === "object" && elem !== null && elem.then;
+      });
+      const promises = keys.map((k2) => this.object[k2]);
+      this.promise = Promise.all(promises);
+      this.indices = keys;
+    }
+    this.resolved = false;
   }
   created(state, id) {
     if (!this.resolved) {
-      this.promise.then((value) => {
+      this.promise.then((values) => {
         var _a2;
         const wasResolved = (_a2 = state.resolved.get(id)) == null ? void 0 : _a2.value;
         if (!wasResolved) {
           this.resolved = true;
           if (Array.isArray(this.object)) {
-            const promiseIndex = this.object.indexOf(this.promise);
             const result = [...this.object];
-            if (promiseIndex < 0) {
-              return result;
+            const indices = this.indices;
+            for (let i2 of indices) {
+              result[indices[i2]] = values[i2];
             }
-            result[promiseIndex] = value;
             state.setResolved(id, { value: result, time: state.time });
             return result;
           } else {
             const result = { ...this.object };
-            const key = Object.keys(this.object).find((key2) => this.object[key2] === this.promise);
-            if (!key) {
-              return result;
+            const indices = this.indices;
+            for (let i2 = 0; i2 < indices.length; i2++) {
+              result[indices[i2]] = values[i2];
             }
-            result[key] = value;
             state.setResolved(id, { value: result, time: state.time });
             return result;
           }
@@ -9586,6 +9638,7 @@ class TSCompiler {
 function translateTS(text2, path2) {
   return new TSCompiler().compile(text2, path2);
 }
+const version = packageJson.version;
 function isGenerator(value) {
   const prototypicalGeneratorFunction = async function* () {
   }();
@@ -9696,8 +9749,8 @@ class Events {
       directWindow.postMessage(obj, "*");
     }
   }
-  resolvePart(promise, object) {
-    return new ResolvePart(promise, object, false);
+  resolvePart(object) {
+    return new ResolvePart(object, false);
   }
 }
 class Behaviors {
@@ -9720,8 +9773,8 @@ class Behaviors {
   delay(varName, delay) {
     return new DelayedEvent(delay, varName, true);
   }
-  resolvePart(promise, object) {
-    return new ResolvePart(promise, object, true);
+  resolvePart(object) {
+    return new ResolvePart(object, true);
   }
   /*
   startsWith(init:any, varName:VarName) {
@@ -9796,6 +9849,10 @@ class ProgramState {
     __publicField(this, "updated");
     __publicField(this, "app");
     __publicField(this, "noTicking");
+    __publicField(this, "programStates");
+    __publicField(this, "lastReturned");
+    __publicField(this, "futureScripts");
+    __publicField(this, "breakpoints");
     this.scripts = [];
     this.order = [];
     this.nodes = /* @__PURE__ */ new Map();
@@ -9809,6 +9866,8 @@ class ProgramState {
     this.updated = false;
     this.app = app;
     this.noTicking = noTicking !== void 0 ? noTicking : false;
+    this.programStates = /* @__PURE__ */ new Map();
+    this.breakpoints = /* @__PURE__ */ new Set();
   }
   evaluator() {
     if (this.noTicking) {
@@ -9837,7 +9896,7 @@ class ProgramState {
       }
     }, 0);
   }
-  setupProgram(scripts) {
+  setupProgram(scripts2) {
     const invalidatedStreamNames = /* @__PURE__ */ new Set();
     for (const [varName, stream] of this.streams) {
       if (!stream[isBehaviorKey]) {
@@ -9857,19 +9916,22 @@ class ProgramState {
         this.inputArray.delete(varName);
       }
     }
-    const jsNodes = [];
+    const jsNodes = /* @__PURE__ */ new Map();
     let id = 0;
-    for (const script of scripts) {
+    for (const script of scripts2) {
       if (!script) {
         continue;
       }
       const nodes = parseJavaScript(script, id, false);
       for (const n2 of nodes) {
-        jsNodes.push(n2);
+        if (jsNodes.get(n2.id)) {
+          console.log(`node "${n2.id}" is defined multiple times`);
+        }
+        jsNodes.set(n2.id, n2);
         id++;
       }
     }
-    const translated = jsNodes.map((jsNode) => ({ id: jsNode.id, code: transpileJavaScript(jsNode) }));
+    const translated = [...jsNodes].map(([_id, jsNode]) => ({ id: jsNode.id, code: transpileJavaScript(jsNode) }));
     const evaluated = translated.map((tr) => this.evalCode(tr));
     const sorted = topologicalSort(evaluated);
     const newNodes = /* @__PURE__ */ new Map();
@@ -9892,7 +9954,7 @@ class ProgramState {
     }
     this.order = sorted;
     this.nodes = newNodes;
-    this.scripts = scripts;
+    this.scripts = scripts2;
     for (const nodeId of this.order) {
       const newNode = newNodes.get(nodeId);
       if (invalidatedInput(newNode, invalidatedStreamNames)) {
@@ -9921,13 +9983,25 @@ class ProgramState {
       }
     }
   }
+  updateProgram(scripts2) {
+    this.futureScripts = scripts2;
+  }
   evaluate(now) {
     this.time = now - this.startTime;
     this.updated = false;
+    let trace;
+    if (this.breakpoints.size > 0) {
+      trace = [];
+    }
     for (let id of this.order) {
       const node = this.nodes.get(id);
       if (!this.ready(node)) {
         continue;
+      }
+      if (trace) {
+        if (this.breakpoints.has(id)) {
+          debugger;
+        }
       }
       const change = this.changeList.get(id);
       const inputArray = node.inputs.map((inputName) => {
@@ -9974,6 +10048,12 @@ class ProgramState {
       if (outputs === void 0) {
         continue;
       }
+      if (trace) {
+        trace.push({ id, inputArray, inputs: node.inputs, value: outputs });
+        if (this.breakpoints.has(id)) {
+          console.log(trace);
+        }
+      }
       const evStream = outputs;
       evStream.evaluate(this, node, inputArray, lastInputArray);
     }
@@ -9983,6 +10063,11 @@ class ProgramState {
         continue;
       }
       stream.conclude(this, id);
+    }
+    if (this.futureScripts) {
+      const scripts2 = this.futureScripts;
+      delete this.futureScripts;
+      this.setupProgram(scripts2);
     }
     return this.updated;
   }
@@ -10087,13 +10172,13 @@ class ProgramState {
     this.streams.set(varName, new Behavior());
   }
   merge(...funcs) {
-    let scripts = this.scripts;
+    let scripts2 = this.scripts;
     const outputs = [];
     funcs.forEach((func) => {
       const { output } = getFunctionBody(func.toString(), true);
       outputs.push(output);
     });
-    this.setupProgram([...scripts, ...outputs]);
+    this.setupProgram([...scripts2, ...outputs]);
   }
   loadTS(path) {
     let i = 0;
@@ -10109,6 +10194,42 @@ class ProgramState {
         URL.revokeObjectURL(dataURL);
       });
     });
+  }
+  component(func) {
+    return (input, key) => {
+      let programState = this.programStates.get(key);
+      if (!programState) {
+        programState = new ProgramState(this.time);
+        programState.lastReturned = void 0;
+        this.programStates.set(key, programState);
+      }
+      const { params, returnArray, output } = getFunctionBody(func.toString(), false);
+      const receivers = params.map((r) => `const ${r} = undefined;`).join("\n");
+      programState.setupProgram([receivers, output]);
+      const trigger = (input2) => {
+        for (let key2 in input2) {
+          programState.setResolvedForSubgraph(
+            key2,
+            { value: input2[key2], time: this.time }
+          );
+        }
+        programState.evaluate(this.time);
+        const result = {};
+        const resultTest = [];
+        if (returnArray) {
+          for (const n2 of returnArray) {
+            const v2 = programState.resolved.get(n2);
+            resultTest.push(v2 ? v2.value : void 0);
+            if (v2 && v2.value !== void 0) {
+              result[n2] = v2.value;
+            }
+          }
+          return result;
+        }
+        return {};
+      };
+      return trigger(input);
+    };
   }
   renkonify(func, optSystem) {
     const programState = new ProgramState(0, optSystem);
@@ -10148,15 +10269,6 @@ class ProgramState {
     }
     return generator;
   }
-  renkonify2(func, optSystem) {
-    const programState = new ProgramState(0, optSystem);
-    const { params, returnArray, output } = getFunctionBody(func.toString(), false);
-    const receivers = params.map((r) => `const ${r} = undefined;`).join("\n");
-    programState.setupProgram([receivers, output]);
-    programState.exports = returnArray || void 0;
-    programState.imports = params;
-    return programState;
-  }
   evaluateSubProgram(programState, params) {
     for (let key in params) {
       programState.registerEvent(key, params[key]);
@@ -10187,11 +10299,19 @@ class ProgramState {
     }
     return partialURL;
   }
-  /*
-    inspector(flag:boolean, dom?: HTMLElement) {
-      showInspector(this, flag === undefined ? true: flag, dom);
-      }
-  */
+  addBreakpoint(...ids) {
+    ids.forEach((id) => {
+      this.breakpoints.add(id);
+    });
+  }
+  removeBreakpoint(...ids) {
+    ids.forEach((id) => {
+      this.breakpoints.delete(id);
+    });
+  }
+  resetBreakpoint() {
+    this.breakpoints = /* @__PURE__ */ new Set();
+  }
 }
 function transpileJSX(code) {
   const node = parseJSX(code);
@@ -10274,5 +10394,6 @@ export {
   ProgramState,
   parseJSX,
   translateTS,
-  transpileJSX
+  transpileJSX,
+  version
 };

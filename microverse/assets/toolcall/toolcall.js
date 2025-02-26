@@ -14,19 +14,11 @@ export function toolcall() {
     const {h, render, html} = import(Renkon.spaceURL("./preact.standalone.module.js"));
     const {ReflectCommands} = import(`${hostName}/tool-call/js/commands.js`);
 
-    /*
-    const trigger = Events.observe((notifier) => {
-        const handler = (event) => {
-            notifier(event);
-            document.body.removeEventListener("click", handler);
-        };
-        document.body.addEventListener("click", handler);
-        return () => document.body.removeEventListener("click", handler);
-        });
-    */
+    const commandListReceiver = Events.receiver();
+    const commandList = Behaviors.keep(commandListReceiver);
+    console.log("commandList", commandList);
 
     const audioContextReceiver = Events.receiver();
-
     const audioContext = Behaviors.keep(audioContextReceiver);
 
     const localMedia = new localMediaModule.LocalMedia({
@@ -94,11 +86,22 @@ export function toolcall() {
     const root = new ReflectCommands(hostName + "/substrate/v1/msgindex").reflect();
     const whisper = root["faster-whisper/transcribe-data"];
 
-    const commandListReceiver = Events.receiver();
+    const spaceRoot = new ReflectCommands(hostName).reflect();
+    // const space = spaceRoot["spaces:new"].run();
+    const space = {space_id: "sp-01JN1YG5AAMF7HMPF4B62KFQW5"};
+    const spaceMsgindex = new ReflectCommands(hostName + `/spaceview;space=${space.space_id}/`).reflect();
+    const spaceLinks = spaceMsgindex["links:query"].run();
 
-    const commandList = Behaviors.keep(commandListReceiver);
+    const storeHref = "/events;data=sp-01JN1Y1RM1F47MMJVGZ8HGE1CK/"
+    // const storeHref = spaceLinks.links["eventstore"].href;
+    const storeMsgindex = new ReflectCommands(hostName + storeHref).reflect();
 
-    console.log("commandList", commandList);
+    console.log("space", space);
+    console.log("streamURL", `${hostName}/events;data=${space.space_id}/stream/events`);
+    console.log("spaceMsgindex", spaceMsgindex);
+    console.log("spaceLinks", spaceLinks);
+    console.log("storeHref", storeHref);
+    console.log("storeMsgIndex", storeMsgindex);
 
     const commandResponseFromCommand = ((toolCall, commandList, input) => {
         console.log("toolCall", input);
@@ -169,14 +172,26 @@ export function toolcall() {
       })(wav);
     */
 
+    /*
+
     const transcribed = ((wav, whisper) => {
         const audio_data = toBase64(new Uint8Array(wav.wav));
         const audio_metadata = {mime_type: "audio/wav"};
         const task = "transcribe";
         return whisper.run({audio_data, audio_metadata, task});
-    })(wav, whisper);
+        })(wav, whisper);
+
+    */
+
+    const writeWav = ((wav) => {
+        console.log("writeWav", wav);
+        const audio_data = toBase64(new Uint8Array(wav.wav));
+        const audio_metadata = {mime_type: "audio/wav"};
+        const task = "transcribe";
+        storeMsgindex["events:write"].run({events: [{audio_data, audio_metadata, task}]});
+    })(wav);
                     
-    console.log("transcribed", transcribed);
+    // console.log("transcribed", transcribed);
 
     const words = ((transcribed) => {
         const result = [];
@@ -185,6 +200,73 @@ export function toolcall() {
         });
         return result;
     })(transcribed);
+
+    const writeEvents = (...events)  => {
+        console.log("writeEvents", events);
+        storeMsgindex["events:write"].run({events});
+    };
+
+    const myWrite = writeEvents({
+        fields: {
+            path: "/rules/defs/transcribe_wav",
+            conditions: [
+                { compare: { type: [{compare: "=", value: "audio/wav"}] } }
+            ],
+            command: {
+                data: {
+                    command_url: "http://substrate:8080/substrate/v1/msgindex",
+                    command: "faster-whisper/transcribe-data",
+                },
+                meta: {
+                    "#/data/parameters/events": {"type": "any"},
+                },
+                msg_in: {
+                    "#/msg/data/parameters/arguments/0/events": "#/data/parameters/events",
+                    "#/msg/data/parameters/arguments/0/command_url": "#/data/command_url",
+                    "#/msg/data/parameters/arguments/0/command": "#/data/command",
+                },
+                msg_out: {
+                    "#/data/returns/next": "#/msg/data/returns/result/next",
+                },
+                msg: {
+                    cap: "reflect",
+                    data: {
+                        url: "/quickjs/",
+                        name: "eval",
+                        parameters: {
+                            source: `
+                function ({events, command_url, command}) {
+                  return {
+                    next: events.map((evt) => {
+                      let {base64} = evt.fields;
+                      const transcribed = reflector.run(command_url, command, {
+                        audio_data: base64,
+                        audio_metadata: {mime_type: "audio/wav"}
+                        task: "transcribe"
+                      });
+                      return {
+                        fields: {
+                           ...transcribed,
+                          links: {
+                            source: {
+                              rel: "eventref",
+                              attributes: {
+                                "eventref:event": evt.id
+                              }
+                            },
+                          },
+                        }
+                      };
+                    })
+                  }
+                }
+              `,
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     const input = Events.change(words.join(" "));
     console.log("words", words);
