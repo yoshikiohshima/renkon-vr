@@ -43,10 +43,8 @@ class TextCommandInterpreterPawn extends PawnBehavior {
         }
         if (command === "searchFor") {
             let arg = args.arg;
-            console.log("searchFor", arg);
             let selection = this.warota.doc.selections[user];
             let text = this.warota.doc.plainText();
-            console.log(text);
             const index = text.indexOf(arg, selection ? selection.end : 0);
             if (index > 0) {
                 this.warota.select(user, index, index + arg.length, false);
@@ -57,7 +55,6 @@ class TextCommandInterpreterPawn extends PawnBehavior {
             let original = args.original;
             let replacement = args.replacement;
 
-            console.log(original, replacement);
             let text = this.warota.doc.plainText();
 
             let newText = text.replaceAll(original, replacement);
