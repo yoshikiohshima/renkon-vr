@@ -11,33 +11,8 @@ class ToolCallWorldPawn extends PawnBehavior {
     setup() {
         this.output = [];
         this.subscribe(this.id, "startAudioContext", "startAudioContext");
-    }
-
-    commandList() {
-        return {
-            cursor_next_line: {
-                description: "Move the cursor to n lines down from the current line",
-                meta: {
-                    "#/data/parameters/nLines": {
-                        type: "number",
-                        description: "The amount of movement.",
-                    },
-                    "#/data/returns/ok": {
-                        type: "boolean"
-                    },
-                }
-            },
-            type_in: {
-                description: "Type in the argument at the current cursor position",
-                meta: {
-                    "#/data/parameters/input": {
-                        type: "string",
-                        description: "The string to be entered."
-                    },
-                    "#/data/returns/ok": {type: "boolean"}
-                }
-            }
-        };
+        console.log(this.id, "startTranscription", "startTranscription");
+        this.subscribe(this.id, "startTranscription", "startTranscription");
     }
 
     startAudioContext(audioContext) {
@@ -46,49 +21,31 @@ class ToolCallWorldPawn extends PawnBehavior {
         }
         window.renkonPromise.then((renkon) => {
             this.renkon = renkon;
-            this.programState = new renkon.ProgramState(0);
+            this.programState = new renkon.ProgramState(Date.now(), this);
             window.programState = this.programState;
-            import("/assets/toolcall/toolcall.js").then((toolcall) => {
-                this.programState.merge(toolcall.toolcall);
-                this.programState.registerEvent("audioContextReceiver", audioContext);
-                this.programState.registerEvent("commandListReceiver", this.commandList());
-
-                this.startTime = Date.now();
-                this.lastTime = this.startTime;
-                let moduleName = this._behavior.module.externalName;
-                this.addUpdateRequest([`${moduleName}$ToolCallWorldPawn`, "update"]);
+            fetch("/assets/toolcall/chatGPT-demo.renkon").then((resp) => resp.text()).then((result) => {
+                const index = result.indexOf("{__codeMap: true, value:");
+                let code;
+                let data1 = JSON.parse(result.slice(0, index));
+                let map = new Map();
+                if (data1?.windowEnabled?.map?.values) {
+                    map = new Map(data1?.windowEnabled?.map?.values);
+                }
+                const data2 = result.slice(index);
+                const array = eval("(" + data2 + ")");
+                code = array.value;
+                code = code.filter((pair) => (!map.get(pair[0]) || map.get(pair[0]).enabled));
+                programState.setupProgram(code.map((pair) => pair[1]), "chatGPT");
+                programState.evaluator(Date.now());
             });
+        }).catch((err) => {
+            console.error(`${docName} could not be loaded`);
         });
     }
 
-    teardown() {
-        let moduleName = this._behavior.module.externalName;
-        this.removeUpdateRequest([`${moduleName}$ToolCallWorldPawn`, "update"]);
-        delete window.toolCallDown;
-        console.log("delete window.toolCallDown;");
-    }
-
-    update() {
+    startTranscription(id) {
         if (!this.programState) {return;}
-        const now = Date.now();
-        if (now - this.lastTime < 16) {return;}
-        try {
-            this.programState.evaluate(now - this.startTime);
-            if (this.programState.myOutput && this.programState.myOutput.length > 0) {
-                this.output.push(...this.programState.myOutput);
-                this.programState.myOutput = [];
-                if (this.toolCallTarget) {
-                    let output = [...this.output];
-                    this.output = [];
-                    this.toolCallTarget.call("ToolCallTrigger$ToolCallTriggerPawn", "processOutput", output);
-                }
-            }
-        } catch(e) {
-            console.log("error in renkon program execution");
-            console.error(e);
-        }
-
-        this.lastTime = now;
+        this.programState.registerEvent("click", id);
     }
 }
 

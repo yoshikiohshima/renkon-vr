@@ -73,7 +73,6 @@ export function init(Constants) {
             card: {
                 name: "text editor",
                 className: "TextFieldActor",
-                parent: "editor owner",
                 translation: [0, -0.5, 0],
                 rotation: [0, 0, 0],
                 depth: 0.05,
@@ -89,6 +88,7 @@ export function init(Constants) {
                 height: 2,
                 textScale: 0.002,
                 shadow: true,
+                parent: "editor owner",
             }
         }
     ];

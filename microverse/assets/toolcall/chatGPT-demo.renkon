@@ -1,0 +1,216 @@
+{"padTitle":"chatGPT-demo",
+"positions":{"map":{"__map":true,
+"values":[["65",{"height":95.16606559595095,
+"id":"65",
+"type":"move",
+"width":521.4537587766198,
+"x":783.6655685591804,
+"y":-335.5132067011916}],["66",{"height":568.4863273346001,
+"id":"66",
+"type":"resize",
+"width":520.4457076228296,
+"x":249.42168855975677,
+"y":71.87959944254219}],["72",{"height":321.52829956252793,
+"id":"72",
+"type":"resize",
+"width":469.7857499866088,
+"x":250.36299839580352,
+"y":-360.4236415635852}],["78",{"height":1613.8390505575894,
+"id":"78",
+"type":"resize",
+"width":828.2576336200782,
+"x":-583.1546329450454,
+"y":-357.4676754222469}],["79",{"height":474.9120824276621,
+"id":"79",
+"type":"move",
+"width":695.20989790569,
+"x":931.326112880443,
+"y":-139.65626787799374}],["82",{"height":177.44249260494198,
+"id":"82",
+"type":"resize",
+"width":835.0604670114599,
+"x":777.8816470923539,
+"y":490.5781212440274}]]}},
+"titles":{"map":{"__map":true,
+"values":[["65",{"id":"65",
+"state":false,
+"title":"apiKey"}],["66",{"id":"66",
+"state":false,
+"title":"recognizer"}],["72",{"id":"72",
+"state":false,
+"title":"init"}],["78",{"id":"78",
+"state":false,
+"title":"editor functions"}],["79",{"id":"79",
+"state":false,
+"title":"request"}],["82",{"id":"82",
+"state":false,
+"title":"untitled"}]]}},
+"version":2,
+"windowEnabled":{"map":{"__map":true,
+"values":[["65",{"enabled":true,
+"id":"65"}],["66",{"enabled":true,
+"id":"66"}],["72",{"enabled":false,
+"id":"72"}],["78",{"enabled":true,
+"id":"78"}],["79",{"enabled":true,
+"id":"79"}],["82",{"enabled":true,
+"id":"82"}]]}},
+"windowTypes":{"map":{"__map":true,
+"values":[["65","code"],["66","code"],["72","code"],["78","code"],["79","code"],["82","code"]]}},
+"windows":["65","66","72","78","79","82"],
+"zIndex":{"map":{"__map":true,
+"values":[["65",111],["66",101],["72",114],["78",106],["79",117],["82",116]]}}}
+{__codeMap: true, value: [[`65`, `const apiKey = new URL(window.top.location).searchParams.get("apiKey");
+`],
+[`66`, `const recognition = (() => {
+  const r = new window.webkitSpeechRecognition();
+  r.lang = 'en-US';
+  r.continuous = false;
+  return r;
+})();
+
+const transcript = Events.observe((notify) => {
+  recognition.onresult = (event) => {
+    const t = event.results;
+    notify(t);
+  };
+  return () => {delete recognition.onresult}
+});
+
+
+const click = Events.receiver();
+const transcriptionTarget = Behaviors.keep(click);
+
+(() => {
+  recognition.start();
+})(click)
+
+console.log(transcript[0][0].transcript);
+
+`],
+[`72`, `const init = (() => {
+  let button = document.body.querySelector("#button");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "button";
+    document.body.appendChild(button);
+    button.textContent = "listen"
+  }
+  return button;
+})();
+
+
+const click = Events.listener(init, "click", evt => evt);
+`],
+[`78`, `const textEditFunctions = [
+  {
+    "name": "cursorNextLine",
+    "description": "Move the cursor to n lines down the current line.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "arg": {
+          "type": "number",
+          "description": "the amount of movement"
+        }
+      },
+      "required": ["arg"]
+    }
+  },
+  {
+    "name": "cursorPrevLine",
+    "description": "Move the cursor to n lines up the current line.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "arg": {
+          "type": "number",
+          "description": "the amount of movement"
+        }
+      },
+      "required": ["arg"]
+    }
+  },
+  {
+    "name": "deleteSelection",
+    "description": "Delete selected characters.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "typeIn",
+    "description": "Type in the argument at the current cursor position.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "arg": {
+          "type": "string",
+          "description": "The string to be entered"
+        }
+      },
+      "required": ["arg"]
+    }
+  },
+  {
+    "name": "searchFor",
+    "description": "Search for the next occurrence of the search string.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "arg": {
+          "type": "string",
+          "description": "The string to search for"
+        }
+      },
+      "required": ["arg"]
+    }
+  },
+  {
+    "name": "replaceAll",
+    "description": "Replace all occurance of the first argument with the second argument.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "original": {
+          "type": "string",
+          "description": "The string to be replaced"
+        },
+        "replacement": {
+          "type": "string",
+          "description": "The string that replaces the original"
+        },
+      },
+      "required": ["original", "replacement"]
+    }
+  }
+]
+`],
+[`79`, `const apiResult = ((transcript) => {
+  return fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${apiKey}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: "gpt-4-0613",  // or newer
+      messages: [
+        { role: "system", content: "You convert voice commands to editor function calls." },
+        { role: "user", content: transcript[0][0].transcript }
+      ],
+      functions: textEditFunctions,
+      function_call: "auto",
+      temperature: 0,
+    }),
+  }).then((res) => res.json());
+})(transcript);
+
+const data = Events.change(apiResult);
+console.log("call", data.choices[0].message.function_call);
+`],
+[`82`, `const _publish = ((functionCall, transcriptionTarget) => {
+  console.log(functionCall, transcriptionTarget);
+  console.log(transcriptionTarget, "functionCall", data.choices[0].message.function_call);
+  Renkon.app.publish(transcriptionTarget, "functionCall", data.choices[0].message.function_call);
+})(data.choices[0].message.function_call, transcriptionTarget);`]]}

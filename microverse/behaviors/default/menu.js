@@ -11,12 +11,16 @@
 import {PawnBehavior} from "../PrototypeBehavior";
 
 class AudioMenuPawn extends PawnBehavior {
-    setup(){
+    setup() {
         this.teardown();
         this.menuItems = [];
         this.installMenu("Start Audio", "#startAudio", () => {
-            let audioContext = new window.AudioContext();
-            this.publish(this.id, "startAudioContext", audioContext);
+            /*
+              const r = new window.webkitSpeechRecognition();
+            r.lang = 'en-US';
+            r.continuous = false;
+            */
+            this.publish(this.id, "startAudioContext");
         });
     }
 

@@ -14,23 +14,34 @@ class TextCommandInterpreterPawn extends PawnBehavior {
     }
 
     editCommand(data) {
-        let command = data.value;
+        console.log("editCommand", data);
+        let command = data.name;
+        let args = JSON.parse(data.arguments);
         if (!command) return;
 
         let user = this.user;
 
-        if (command.command === "cursor_next_line") {
-            let nLines = command.parameters["nLines"];
-            this.warota.handleKey(user, 40, false, false, nLines);
+        if (command === "cursorNextLine") {
+            let arg = args.arg;
+            this.warota.handleKey(user, 40, false, false, arg);
             this.changed(true); // this calls "changed" of TextFieldPawn
         }
-        if (command.command === "type_in") {
-            this.warota.insert(user, [{text: command.parameters["input"]}]);
+        if (command === "typeIn") {
+            let arg = args.arg;
+            this.warota.insert(user, [{text: arg}]);
             this.changed(true); // this calls "changed" of TextFieldPawn
         }
-        if (command.command === "insert") {
-            this.warota.insert(user, [{text: command.parameters["input"]}]);
-            this.changed(true); // this calls "changed" of TextFieldPawn
+        if (command === "searchFor") {
+            let arg = args.arg;
+            console.log("searchFor", arg);
+            let selection = this.warota.doc.selections[user];
+            let text = this.warota.doc.plainText();
+            console.log(text);
+            const index = text.indexOf(arg, selection ? selection.end : 0);
+            if (index > 0) {
+                this.warota.select(user, index, index + arg.length, false);
+                this.changed(true); // this calls "changed" of TextFieldPawn
+            }
         }
     }
 }

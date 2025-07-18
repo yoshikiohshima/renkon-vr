@@ -16,29 +16,25 @@ class ToolCallTriggerPawn extends PawnBehavior {
         this.triggerWorld = Microverse.GetPawn(world.id);
         this.addEventListener("pointerDown", "onPointerDown");
         this.addEventListener("pointerUp", "onPointerUp");
+        console.log(this.id, "functionCall", "functionCall");
+        this.subscribe(this.id, "functionCall", "functionCall");
         this.makeButton();
     }
 
-    processOutput(output) {
-        for (let elem of output) {
-            console.log("elem", elem);
-            this.textField.publish(this.textField.id, "editCommand", elem);
-        }
+    functionCall(data) {
+        this.textField.publish(this.textField.id, "editCommand", data);
     }
 
     onPointerDown(p3d) {
-        window.toolCallDown = true;
         let avatar = this.getMyAvatar();
         this.triggerWorld.toolCallTarget = this;
-        console.log("window.toolCallDown = true;");
+        console.log("toolCallTarget", this.triggerWorld, this);
         avatar.addFirstResponder("pointerUp", {}, this);
+        this.publish(this.triggerWorld.id, "startTranscription", this.id);
     }
 
     onPointerUp(p3d) {
-        window.toolCallDown = false;
         let avatar = this.getMyAvatar();
-        this.triggerWorld.toolCallTarget = null;
-        console.log("window.toolCallDown = false;");
         avatar.removeFirstResponder("pointerUp", {}, this);
     }
 

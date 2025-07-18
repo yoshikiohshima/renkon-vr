@@ -97,15 +97,15 @@ var TokenType = function TokenType2(label, conf) {
   this.binop = conf.binop || null;
   this.updateContext = null;
 };
-function binop(name2, prec) {
-  return new TokenType(name2, { beforeExpr: true, binop: prec });
+function binop(name, prec) {
+  return new TokenType(name, { beforeExpr: true, binop: prec });
 }
 var beforeExpr = { beforeExpr: true }, startsExpr = { startsExpr: true };
 var keywords = {};
-function kw(name2, options) {
+function kw(name, options) {
   if (options === void 0) options = {};
-  options.keyword = name2;
-  return keywords[name2] = new TokenType(name2, options);
+  options.keyword = name;
+  return keywords[name] = new TokenType(name, options);
 }
 var types$1 = {
   num: new TokenType("num", startsExpr),
@@ -411,7 +411,7 @@ function pushComment(options, array) {
     array.push(comment);
   };
 }
-var SCOPE_TOP = 1, SCOPE_FUNCTION = 2, SCOPE_ASYNC = 4, SCOPE_GENERATOR = 8, SCOPE_ARROW = 16, SCOPE_SIMPLE_CATCH = 32, SCOPE_SUPER = 64, SCOPE_DIRECT_SUPER = 128, SCOPE_CLASS_STATIC_BLOCK = 256, SCOPE_VAR = SCOPE_TOP | SCOPE_FUNCTION | SCOPE_CLASS_STATIC_BLOCK;
+var SCOPE_TOP = 1, SCOPE_FUNCTION = 2, SCOPE_ASYNC = 4, SCOPE_GENERATOR = 8, SCOPE_ARROW = 16, SCOPE_SIMPLE_CATCH = 32, SCOPE_SUPER = 64, SCOPE_DIRECT_SUPER = 128, SCOPE_CLASS_STATIC_BLOCK = 256, SCOPE_CLASS_FIELD_INIT = 512, SCOPE_VAR = SCOPE_TOP | SCOPE_FUNCTION | SCOPE_CLASS_STATIC_BLOCK;
 function functionFlags(async, generator) {
   return SCOPE_FUNCTION | (async ? SCOPE_ASYNC : 0) | (generator ? SCOPE_GENERATOR : 0);
 }
@@ -474,19 +474,20 @@ prototypeAccessors.inFunction.get = function() {
   return (this.currentVarScope().flags & SCOPE_FUNCTION) > 0;
 };
 prototypeAccessors.inGenerator.get = function() {
-  return (this.currentVarScope().flags & SCOPE_GENERATOR) > 0 && !this.currentVarScope().inClassFieldInit;
+  return (this.currentVarScope().flags & SCOPE_GENERATOR) > 0;
 };
 prototypeAccessors.inAsync.get = function() {
-  return (this.currentVarScope().flags & SCOPE_ASYNC) > 0 && !this.currentVarScope().inClassFieldInit;
+  return (this.currentVarScope().flags & SCOPE_ASYNC) > 0;
 };
 prototypeAccessors.canAwait.get = function() {
   for (var i2 = this.scopeStack.length - 1; i2 >= 0; i2--) {
-    var scope = this.scopeStack[i2];
-    if (scope.inClassFieldInit || scope.flags & SCOPE_CLASS_STATIC_BLOCK) {
+    var ref2 = this.scopeStack[i2];
+    var flags = ref2.flags;
+    if (flags & (SCOPE_CLASS_STATIC_BLOCK | SCOPE_CLASS_FIELD_INIT)) {
       return false;
     }
-    if (scope.flags & SCOPE_FUNCTION) {
-      return (scope.flags & SCOPE_ASYNC) > 0;
+    if (flags & SCOPE_FUNCTION) {
+      return (flags & SCOPE_ASYNC) > 0;
     }
   }
   return this.inModule && this.options.ecmaVersion >= 13 || this.options.allowAwaitOutsideFunction;
@@ -494,8 +495,7 @@ prototypeAccessors.canAwait.get = function() {
 prototypeAccessors.allowSuper.get = function() {
   var ref2 = this.currentThisScope();
   var flags = ref2.flags;
-  var inClassFieldInit = ref2.inClassFieldInit;
-  return (flags & SCOPE_SUPER) > 0 || inClassFieldInit || this.options.allowSuperOutsideMethod;
+  return (flags & SCOPE_SUPER) > 0 || this.options.allowSuperOutsideMethod;
 };
 prototypeAccessors.allowDirectSuper.get = function() {
   return (this.currentThisScope().flags & SCOPE_DIRECT_SUPER) > 0;
@@ -504,10 +504,14 @@ prototypeAccessors.treatFunctionsAsVar.get = function() {
   return this.treatFunctionsAsVarInScope(this.currentScope());
 };
 prototypeAccessors.allowNewDotTarget.get = function() {
-  var ref2 = this.currentThisScope();
-  var flags = ref2.flags;
-  var inClassFieldInit = ref2.inClassFieldInit;
-  return (flags & (SCOPE_FUNCTION | SCOPE_CLASS_STATIC_BLOCK)) > 0 || inClassFieldInit;
+  for (var i2 = this.scopeStack.length - 1; i2 >= 0; i2--) {
+    var ref2 = this.scopeStack[i2];
+    var flags = ref2.flags;
+    if (flags & (SCOPE_CLASS_STATIC_BLOCK | SCOPE_CLASS_FIELD_INIT) || flags & SCOPE_FUNCTION && !(flags & SCOPE_ARROW)) {
+      return true;
+    }
+  }
+  return false;
 };
 prototypeAccessors.inClassStaticBlock.get = function() {
   return (this.currentVarScope().flags & SCOPE_CLASS_STATIC_BLOCK) > 0;
@@ -560,26 +564,26 @@ pp$9.strictDirective = function(start) {
     }
   }
 };
-pp$9.eat = function(type2) {
-  if (this.type === type2) {
+pp$9.eat = function(type) {
+  if (this.type === type) {
     this.next();
     return true;
   } else {
     return false;
   }
 };
-pp$9.isContextual = function(name2) {
-  return this.type === types$1.name && this.value === name2 && !this.containsEsc;
+pp$9.isContextual = function(name) {
+  return this.type === types$1.name && this.value === name && !this.containsEsc;
 };
-pp$9.eatContextual = function(name2) {
-  if (!this.isContextual(name2)) {
+pp$9.eatContextual = function(name) {
+  if (!this.isContextual(name)) {
     return false;
   }
   this.next();
   return true;
 };
-pp$9.expectContextual = function(name2) {
-  if (!this.eatContextual(name2)) {
+pp$9.expectContextual = function(name) {
+  if (!this.eatContextual(name)) {
     this.unexpected();
   }
 };
@@ -610,8 +614,8 @@ pp$9.afterTrailingComma = function(tokType, notNext) {
     return true;
   }
 };
-pp$9.expect = function(type2) {
-  this.eat(type2) || this.unexpected();
+pp$9.expect = function(type) {
+  this.eat(type) || this.unexpected();
 };
 pp$9.unexpected = function(pos) {
   this.raise(pos != null ? pos : this.start, "Unexpected token");
@@ -673,8 +677,8 @@ pp$8.parseTopLevel = function(node) {
   }
   if (this.inModule) {
     for (var i2 = 0, list2 = Object.keys(this.undefinedExports); i2 < list2.length; i2 += 1) {
-      var name2 = list2[i2];
-      this.raiseRecoverable(this.undefinedExports[name2].start, "Export '" + name2 + "' is not defined");
+      var name = list2[i2];
+      this.raiseRecoverable(this.undefinedExports[name].start, "Export '" + name + "' is not defined");
     }
   }
   this.adaptDirectivePrologue(node.body);
@@ -1342,11 +1346,9 @@ pp$8.parseClassField = function(field) {
     this.raise(field.key.start, "Classes can't have a static field named 'prototype'");
   }
   if (this.eat(types$1.eq)) {
-    var scope = this.currentThisScope();
-    var inClassFieldInit = scope.inClassFieldInit;
-    scope.inClassFieldInit = true;
+    this.enterScope(SCOPE_CLASS_FIELD_INIT | SCOPE_SUPER);
     field.value = this.parseMaybeAssign();
-    scope.inClassFieldInit = inClassFieldInit;
+    this.exitScope();
   } else {
     field.value = null;
   }
@@ -1409,26 +1411,26 @@ pp$8.exitClassBody = function() {
   }
 };
 function isPrivateNameConflicted(privateNameMap, element) {
-  var name2 = element.key.name;
-  var curr = privateNameMap[name2];
+  var name = element.key.name;
+  var curr = privateNameMap[name];
   var next = "true";
   if (element.type === "MethodDefinition" && (element.kind === "get" || element.kind === "set")) {
     next = (element.static ? "s" : "i") + element.kind;
   }
   if (curr === "iget" && next === "iset" || curr === "iset" && next === "iget" || curr === "sget" && next === "sset" || curr === "sset" && next === "sget") {
-    privateNameMap[name2] = "true";
+    privateNameMap[name] = "true";
     return false;
   } else if (!curr) {
-    privateNameMap[name2] = next;
+    privateNameMap[name] = next;
     return false;
   } else {
     return true;
   }
 }
-function checkKeyName(node, name2) {
+function checkKeyName(node, name) {
   var computed = node.computed;
   var key = node.key;
-  return !computed && (key.type === "Identifier" && key.name === name2 || key.type === "Literal" && key.value === name2);
+  return !computed && (key.type === "Identifier" && key.name === name || key.type === "Literal" && key.value === name);
 }
 pp$8.parseExportAllDeclaration = function(node, exports) {
   if (this.options.ecmaVersion >= 11) {
@@ -1469,6 +1471,9 @@ pp$8.parseExport = function(node, exports) {
     }
     node.specifiers = [];
     node.source = null;
+    if (this.options.ecmaVersion >= 16) {
+      node.attributes = [];
+    }
   } else {
     node.declaration = null;
     node.specifiers = this.parseExportSpecifiers(exports);
@@ -1490,6 +1495,9 @@ pp$8.parseExport = function(node, exports) {
         }
       }
       node.source = null;
+      if (this.options.ecmaVersion >= 16) {
+        node.attributes = [];
+      }
     }
     this.semicolon();
   }
@@ -1516,39 +1524,39 @@ pp$8.parseExportDefaultDeclaration = function() {
     return declaration;
   }
 };
-pp$8.checkExport = function(exports, name2, pos) {
+pp$8.checkExport = function(exports, name, pos) {
   if (!exports) {
     return;
   }
-  if (typeof name2 !== "string") {
-    name2 = name2.type === "Identifier" ? name2.name : name2.value;
+  if (typeof name !== "string") {
+    name = name.type === "Identifier" ? name.name : name.value;
   }
-  if (hasOwn(exports, name2)) {
-    this.raiseRecoverable(pos, "Duplicate export '" + name2 + "'");
+  if (hasOwn(exports, name)) {
+    this.raiseRecoverable(pos, "Duplicate export '" + name + "'");
   }
-  exports[name2] = true;
+  exports[name] = true;
 };
 pp$8.checkPatternExport = function(exports, pat) {
-  var type2 = pat.type;
-  if (type2 === "Identifier") {
+  var type = pat.type;
+  if (type === "Identifier") {
     this.checkExport(exports, pat, pat.start);
-  } else if (type2 === "ObjectPattern") {
+  } else if (type === "ObjectPattern") {
     for (var i2 = 0, list2 = pat.properties; i2 < list2.length; i2 += 1) {
       var prop = list2[i2];
       this.checkPatternExport(exports, prop);
     }
-  } else if (type2 === "ArrayPattern") {
+  } else if (type === "ArrayPattern") {
     for (var i$1 = 0, list$1 = pat.elements; i$1 < list$1.length; i$1 += 1) {
       var elt = list$1[i$1];
       if (elt) {
         this.checkPatternExport(exports, elt);
       }
     }
-  } else if (type2 === "Property") {
+  } else if (type === "Property") {
     this.checkPatternExport(exports, pat.value);
-  } else if (type2 === "AssignmentPattern") {
+  } else if (type === "AssignmentPattern") {
     this.checkPatternExport(exports, pat.left);
-  } else if (type2 === "RestElement") {
+  } else if (type === "RestElement") {
     this.checkPatternExport(exports, pat.argument);
   }
 };
@@ -2015,13 +2023,13 @@ pp$6.inGeneratorContext = function() {
   return false;
 };
 pp$6.updateContext = function(prevType) {
-  var update, type2 = this.type;
-  if (type2.keyword && prevType === types$1.dot) {
+  var update, type = this.type;
+  if (type.keyword && prevType === types$1.dot) {
     this.exprAllowed = false;
-  } else if (update = type2.updateContext) {
+  } else if (update = type.updateContext) {
     update.call(this, prevType);
   } else {
-    this.exprAllowed = type2.beforeExpr;
+    this.exprAllowed = type.beforeExpr;
   }
 };
 pp$6.overrideContext = function(tokenCtx) {
@@ -2106,20 +2114,20 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
     return;
   }
   var key = prop.key;
-  var name2;
+  var name;
   switch (key.type) {
     case "Identifier":
-      name2 = key.name;
+      name = key.name;
       break;
     case "Literal":
-      name2 = String(key.value);
+      name = String(key.value);
       break;
     default:
       return;
   }
   var kind = prop.kind;
   if (this.options.ecmaVersion >= 6) {
-    if (name2 === "__proto__" && kind === "init") {
+    if (name === "__proto__" && kind === "init") {
       if (propHash.proto) {
         if (refDestructuringErrors) {
           if (refDestructuringErrors.doubleProto < 0) {
@@ -2133,8 +2141,8 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
     }
     return;
   }
-  name2 = "$" + name2;
-  var other = propHash[name2];
+  name = "$" + name;
+  var other = propHash[name];
   if (other) {
     var redefinition;
     if (kind === "init") {
@@ -2146,7 +2154,7 @@ pp$5.checkPropClash = function(prop, propHash, refDestructuringErrors) {
       this.raiseRecoverable(key.start, "Redefinition of property");
     }
   } else {
-    other = propHash[name2] = {
+    other = propHash[name] = {
       init: false,
       get: false,
       set: false
@@ -2849,9 +2857,10 @@ pp$5.parseProperty = function(isPattern, refDestructuringErrors) {
   return this.finishNode(prop, "Property");
 };
 pp$5.parseGetterSetter = function(prop) {
-  prop.kind = prop.key.name;
+  var kind = prop.key.name;
   this.parsePropertyName(prop);
   prop.value = this.parseMethod(false);
+  prop.kind = kind;
   var paramCount = prop.kind === "get" ? 0 : 1;
   if (prop.value.params.length !== paramCount) {
     var start = prop.value.start;
@@ -2877,9 +2886,9 @@ pp$5.parsePropertyValue = function(prop, isPattern, isGenerator2, isAsync, start
     if (isPattern) {
       this.unexpected();
     }
-    prop.kind = "init";
     prop.method = true;
     prop.value = this.parseMethod(isGenerator2, isAsync);
+    prop.kind = "init";
   } else if (!isPattern && !containsEsc && this.options.ecmaVersion >= 5 && !prop.computed && prop.key.type === "Identifier" && (prop.key.name === "get" || prop.key.name === "set") && (this.type !== types$1.comma && this.type !== types$1.braceR && this.type !== types$1.eq)) {
     if (isGenerator2 || isAsync) {
       this.unexpected();
@@ -2893,7 +2902,6 @@ pp$5.parsePropertyValue = function(prop, isPattern, isGenerator2, isAsync, start
     if (prop.key.name === "await" && !this.awaitIdentPos) {
       this.awaitIdentPos = startPos;
     }
-    prop.kind = "init";
     if (isPattern) {
       prop.value = this.parseMaybeDefault(startPos, startLoc, this.copyNode(prop.key));
     } else if (this.type === types$1.eq && refDestructuringErrors) {
@@ -2904,6 +2912,7 @@ pp$5.parsePropertyValue = function(prop, isPattern, isGenerator2, isAsync, start
     } else {
       prop.value = this.copyNode(prop.key);
     }
+    prop.kind = "init";
     prop.shorthand = true;
   } else {
     this.unexpected();
@@ -3046,31 +3055,31 @@ pp$5.parseExprList = function(close, allowTrailingComma, allowEmpty, refDestruct
 pp$5.checkUnreserved = function(ref2) {
   var start = ref2.start;
   var end = ref2.end;
-  var name2 = ref2.name;
-  if (this.inGenerator && name2 === "yield") {
+  var name = ref2.name;
+  if (this.inGenerator && name === "yield") {
     this.raiseRecoverable(start, "Cannot use 'yield' as identifier inside a generator");
   }
-  if (this.inAsync && name2 === "await") {
+  if (this.inAsync && name === "await") {
     this.raiseRecoverable(start, "Cannot use 'await' as identifier inside an async function");
   }
-  if (this.currentThisScope().inClassFieldInit && name2 === "arguments") {
+  if (!(this.currentThisScope().flags & SCOPE_VAR) && name === "arguments") {
     this.raiseRecoverable(start, "Cannot use 'arguments' in class field initializer");
   }
-  if (this.inClassStaticBlock && (name2 === "arguments" || name2 === "await")) {
-    this.raise(start, "Cannot use " + name2 + " in class static initialization block");
+  if (this.inClassStaticBlock && (name === "arguments" || name === "await")) {
+    this.raise(start, "Cannot use " + name + " in class static initialization block");
   }
-  if (this.keywords.test(name2)) {
-    this.raise(start, "Unexpected keyword '" + name2 + "'");
+  if (this.keywords.test(name)) {
+    this.raise(start, "Unexpected keyword '" + name + "'");
   }
   if (this.options.ecmaVersion < 6 && this.input.slice(start, end).indexOf("\\") !== -1) {
     return;
   }
   var re = this.strict ? this.reservedWordsStrict : this.reservedWords;
-  if (re.test(name2)) {
-    if (!this.inAsync && name2 === "await") {
+  if (re.test(name)) {
+    if (!this.inAsync && name === "await") {
       this.raiseRecoverable(start, "Cannot use keyword 'await' outside an async function");
     }
-    this.raiseRecoverable(start, "The keyword '" + name2 + "' is reserved");
+    this.raiseRecoverable(start, "The keyword '" + name + "' is reserved");
   }
 };
 pp$5.parseIdent = function(liberal) {
@@ -3146,6 +3155,9 @@ var pp$4 = Parser.prototype;
 pp$4.raise = function(pos, message) {
   var loc = getLineInfo(this.input, pos);
   message += " (" + loc.line + ":" + loc.column + ")";
+  if (this.sourceFile) {
+    message += " in " + this.sourceFile;
+  }
   var err = new SyntaxError(message);
   err.pos = pos;
   err.loc = loc;
@@ -3164,7 +3176,6 @@ var Scope = function Scope2(flags) {
   this.var = [];
   this.lexical = [];
   this.functions = [];
-  this.inClassFieldInit = false;
 };
 pp$3.enterScope = function(flags) {
   this.scopeStack.push(new Scope(flags));
@@ -3175,36 +3186,36 @@ pp$3.exitScope = function() {
 pp$3.treatFunctionsAsVarInScope = function(scope) {
   return scope.flags & SCOPE_FUNCTION || !this.inModule && scope.flags & SCOPE_TOP;
 };
-pp$3.declareName = function(name2, bindingType, pos) {
+pp$3.declareName = function(name, bindingType, pos) {
   var redeclared = false;
   if (bindingType === BIND_LEXICAL) {
     var scope = this.currentScope();
-    redeclared = scope.lexical.indexOf(name2) > -1 || scope.functions.indexOf(name2) > -1 || scope.var.indexOf(name2) > -1;
-    scope.lexical.push(name2);
+    redeclared = scope.lexical.indexOf(name) > -1 || scope.functions.indexOf(name) > -1 || scope.var.indexOf(name) > -1;
+    scope.lexical.push(name);
     if (this.inModule && scope.flags & SCOPE_TOP) {
-      delete this.undefinedExports[name2];
+      delete this.undefinedExports[name];
     }
   } else if (bindingType === BIND_SIMPLE_CATCH) {
     var scope$1 = this.currentScope();
-    scope$1.lexical.push(name2);
+    scope$1.lexical.push(name);
   } else if (bindingType === BIND_FUNCTION) {
     var scope$2 = this.currentScope();
     if (this.treatFunctionsAsVar) {
-      redeclared = scope$2.lexical.indexOf(name2) > -1;
+      redeclared = scope$2.lexical.indexOf(name) > -1;
     } else {
-      redeclared = scope$2.lexical.indexOf(name2) > -1 || scope$2.var.indexOf(name2) > -1;
+      redeclared = scope$2.lexical.indexOf(name) > -1 || scope$2.var.indexOf(name) > -1;
     }
-    scope$2.functions.push(name2);
+    scope$2.functions.push(name);
   } else {
     for (var i2 = this.scopeStack.length - 1; i2 >= 0; --i2) {
       var scope$3 = this.scopeStack[i2];
-      if (scope$3.lexical.indexOf(name2) > -1 && !(scope$3.flags & SCOPE_SIMPLE_CATCH && scope$3.lexical[0] === name2) || !this.treatFunctionsAsVarInScope(scope$3) && scope$3.functions.indexOf(name2) > -1) {
+      if (scope$3.lexical.indexOf(name) > -1 && !(scope$3.flags & SCOPE_SIMPLE_CATCH && scope$3.lexical[0] === name) || !this.treatFunctionsAsVarInScope(scope$3) && scope$3.functions.indexOf(name) > -1) {
         redeclared = true;
         break;
       }
-      scope$3.var.push(name2);
+      scope$3.var.push(name);
       if (this.inModule && scope$3.flags & SCOPE_TOP) {
-        delete this.undefinedExports[name2];
+        delete this.undefinedExports[name];
       }
       if (scope$3.flags & SCOPE_VAR) {
         break;
@@ -3212,7 +3223,7 @@ pp$3.declareName = function(name2, bindingType, pos) {
     }
   }
   if (redeclared) {
-    this.raiseRecoverable(pos, "Identifier '" + name2 + "' has already been declared");
+    this.raiseRecoverable(pos, "Identifier '" + name + "' has already been declared");
   }
 };
 pp$3.checkLocalExport = function(id) {
@@ -3226,7 +3237,7 @@ pp$3.currentScope = function() {
 pp$3.currentVarScope = function() {
   for (var i2 = this.scopeStack.length - 1; ; i2--) {
     var scope = this.scopeStack[i2];
-    if (scope.flags & SCOPE_VAR) {
+    if (scope.flags & (SCOPE_VAR | SCOPE_CLASS_FIELD_INIT | SCOPE_CLASS_STATIC_BLOCK)) {
       return scope;
     }
   }
@@ -3234,7 +3245,7 @@ pp$3.currentVarScope = function() {
 pp$3.currentThisScope = function() {
   for (var i2 = this.scopeStack.length - 1; ; i2--) {
     var scope = this.scopeStack[i2];
-    if (scope.flags & SCOPE_VAR && !(scope.flags & SCOPE_ARROW)) {
+    if (scope.flags & (SCOPE_VAR | SCOPE_CLASS_FIELD_INIT | SCOPE_CLASS_STATIC_BLOCK) && !(scope.flags & SCOPE_ARROW)) {
       return scope;
     }
   }
@@ -3260,8 +3271,8 @@ pp$2.startNode = function() {
 pp$2.startNodeAt = function(pos, loc) {
   return new Node(this, pos, loc);
 };
-function finishNodeAt(node, type2, pos, loc) {
-  node.type = type2;
+function finishNodeAt(node, type, pos, loc) {
+  node.type = type;
   node.end = pos;
   if (this.options.locations) {
     node.loc.end = loc;
@@ -3271,11 +3282,11 @@ function finishNodeAt(node, type2, pos, loc) {
   }
   return node;
 }
-pp$2.finishNode = function(node, type2) {
-  return finishNodeAt.call(this, node, type2, this.lastTokEnd, this.lastTokEndLoc);
+pp$2.finishNode = function(node, type) {
+  return finishNodeAt.call(this, node, type, this.lastTokEnd, this.lastTokEndLoc);
 };
-pp$2.finishNodeAt = function(node, type2, pos, loc) {
-  return finishNodeAt.call(this, node, type2, pos, loc);
+pp$2.finishNodeAt = function(node, type, pos, loc) {
+  return finishNodeAt.call(this, node, type, pos, loc);
 };
 pp$2.copyNode = function(node) {
   var newNode = new Node(this, node.start, this.startLoc);
@@ -3529,8 +3540,8 @@ pp$1.regexp_pattern = function(state) {
     state.raise("Invalid escape");
   }
   for (var i2 = 0, list2 = state.backReferenceNames; i2 < list2.length; i2 += 1) {
-    var name2 = list2[i2];
-    if (!state.groupNames[name2]) {
+    var name = list2[i2];
+    if (!state.groupNames[name]) {
       state.raise("Invalid named capture referenced");
     }
   }
@@ -4169,10 +4180,10 @@ pp$1.regexp_eatUnicodePropertyValueExpression = function(state) {
     61
     /* = */
   )) {
-    var name2 = state.lastStringValue;
+    var name = state.lastStringValue;
     if (this.regexp_eatUnicodePropertyValue(state)) {
       var value = state.lastStringValue;
-      this.regexp_validateUnicodePropertyNameAndValue(state, name2, value);
+      this.regexp_validateUnicodePropertyNameAndValue(state, name, value);
       return CharSetOk;
     }
   }
@@ -4183,11 +4194,11 @@ pp$1.regexp_eatUnicodePropertyValueExpression = function(state) {
   }
   return CharSetNone;
 };
-pp$1.regexp_validateUnicodePropertyNameAndValue = function(state, name2, value) {
-  if (!hasOwn(state.unicodeProperties.nonBinary, name2)) {
+pp$1.regexp_validateUnicodePropertyNameAndValue = function(state, name, value) {
+  if (!hasOwn(state.unicodeProperties.nonBinary, name)) {
     state.raise("Invalid property name");
   }
-  if (!state.unicodeProperties.nonBinary[name2].test(value)) {
+  if (!state.unicodeProperties.nonBinary[name].test(value)) {
     state.raise("Invalid property value");
   }
 };
@@ -4794,13 +4805,13 @@ pp.skipSpace = function() {
     }
   }
 };
-pp.finishToken = function(type2, val) {
+pp.finishToken = function(type, val) {
   this.end = this.pos;
   if (this.options.locations) {
     this.endLoc = this.curPosition();
   }
   var prevType = this.type;
-  this.type = type2;
+  this.type = type;
   this.value = val;
   this.updateContext(prevType);
 };
@@ -5037,10 +5048,10 @@ pp.getTokenFromCode = function(code) {
   }
   this.raise(this.pos, "Unexpected character '" + codePointToString(code) + "'");
 };
-pp.finishOp = function(type2, size) {
+pp.finishOp = function(type, size) {
   var str = this.input.slice(this.pos, this.pos + size);
   this.pos += size;
-  return this.finishToken(type2, str);
+  return this.finishToken(type, str);
 };
 pp.readRegexp = function() {
   var escaped, inClass, start = this.pos;
@@ -5452,13 +5463,13 @@ pp.readWord1 = function() {
 };
 pp.readWord = function() {
   var word = this.readWord1();
-  var type2 = types$1.name;
+  var type = types$1.name;
   if (this.keywords.test(word)) {
-    type2 = keywords[word];
+    type = keywords[word];
   }
-  return this.finishToken(type2, word);
+  return this.finishToken(type, word);
 };
-var version$2 = "8.14.0";
+var version$2 = "8.14.1";
 Parser.acorn = {
   Parser,
   version: version$2,
@@ -6025,10 +6036,10 @@ const require$$1 = /* @__PURE__ */ getAugmentedNamespace(t);
       // Parse namespaced identifier.
       jsx_parseNamespacedName() {
         let startPos = this.start, startLoc = this.startLoc;
-        let name2 = this.jsx_parseIdentifier();
-        if (!options.allowNamespaces || !this.eat(tt.colon)) return name2;
+        let name = this.jsx_parseIdentifier();
+        if (!options.allowNamespaces || !this.eat(tt.colon)) return name;
         var node = this.startNodeAt(startPos, startLoc);
-        node.namespace = name2;
+        node.namespace = name;
         node.name = this.jsx_parseIdentifier();
         return this.finishNode(node, "JSXNamespacedName");
       }
@@ -6221,10 +6232,10 @@ function simple(node, visitors, baseVisitor, state, override) {
     baseVisitor = base;
   }
   (function c2(node2, st, override2) {
-    var type2 = override2 || node2.type;
-    baseVisitor[type2](node2, st, c2);
-    if (visitors[type2]) {
-      visitors[type2](node2, st);
+    var type = override2 || node2.type;
+    baseVisitor[type](node2, st, c2);
+    if (visitors[type]) {
+      visitors[type](node2, st);
     }
   })(node, state, override);
 }
@@ -6234,14 +6245,14 @@ function ancestor(node, visitors, baseVisitor, state, override) {
     baseVisitor = base;
   }
   (function c2(node2, st, override2) {
-    var type2 = override2 || node2.type;
+    var type = override2 || node2.type;
     var isNew = node2 !== ancestors[ancestors.length - 1];
     if (isNew) {
       ancestors.push(node2);
     }
-    baseVisitor[type2](node2, st, c2);
-    if (visitors[type2]) {
-      visitors[type2](node2, st || ancestors, ancestors);
+    baseVisitor[type](node2, st, c2);
+    if (visitors[type]) {
+      visitors[type](node2, st || ancestors, ancestors);
     }
     if (isNew) {
       ancestors.pop();
@@ -6538,6 +6549,7 @@ const defaultGlobals = /* @__PURE__ */ new Set([
   "Boolean",
   "BigInt",
   "btoa",
+  "cancelAnimationFrame",
   "clearInterval",
   "clearTimeout",
   "console",
@@ -6554,6 +6566,7 @@ const defaultGlobals = /* @__PURE__ */ new Set([
   "Error",
   "escape",
   "eval",
+  "EventSource",
   "fetch",
   "File",
   "FileList",
@@ -6574,6 +6587,7 @@ const defaultGlobals = /* @__PURE__ */ new Set([
   "JSON",
   "Map",
   "Math",
+  "MessageChannel",
   "NaN",
   "Number",
   "navigator",
@@ -6588,12 +6602,12 @@ const defaultGlobals = /* @__PURE__ */ new Set([
   "ReferenceError",
   "Reflect",
   "RegExp",
-  "cancelAnimationFrame",
   "requestAnimationFrame",
   "Set",
   "setInterval",
   "setTimeout",
   "String",
+  "structuredClone",
   "Symbol",
   "SyntaxError",
   "TextDecoder",
@@ -6614,6 +6628,12 @@ const defaultGlobals = /* @__PURE__ */ new Set([
   "Worker",
   "window"
 ]);
+const renkonGlobals = /* @__PURE__ */ new Set([
+  "Events",
+  "Behaviors",
+  "Renkon"
+]);
+const globals = Object.fromEntries([...defaultGlobals.union(renkonGlobals)].map((k2) => [k2, false]));
 function syntaxError(message, node, input) {
   const { line, column } = getLineInfo(input, node.start);
   return new SyntaxError(`${message} (${line}:${column})`);
@@ -6623,7 +6643,7 @@ function checkAssignments(node, references, input) {
     switch (node2.type) {
       case "Identifier":
         if (references.includes(node2)) throw syntaxError(`Assignment to external variable '${node2.name}'`, node2, input);
-        if (defaultGlobals.has(node2.name)) throw syntaxError(`Assignment to global '${node2.name}'`, node2, input);
+        if (globals[node2.name] === false) throw syntaxError(`Assignment to global '${node2.name}'`, node2, input);
         break;
       case "ObjectPattern":
         node2.properties.forEach((node3) => checkConst(node3.type === "Property" ? node3.value : node3));
@@ -6651,9 +6671,10 @@ function checkAssignments(node, references, input) {
   });
 }
 function findDeclarations(node, input) {
+  var _a2, _b2;
   const declarations = [];
   function declareLocal(node2) {
-    if (defaultGlobals.has(node2.name) || node2.name === "arguments") {
+    if (globals[node2.name] === false || node2.name === "arguments") {
       throw syntaxError(`Global '${node2.name}' cannot be redefined`, node2, input);
     }
     declarations.push(node2);
@@ -6689,7 +6710,55 @@ function findDeclarations(node, input) {
       case "ImportDeclaration":
         child.specifiers.forEach((node2) => declareLocal(node2.local));
         break;
+      case "ExportNamedDeclaration":
+        if (((_a2 = child.declaration) == null ? void 0 : _a2.type) === "VariableDeclaration") {
+          child.declaration.declarations.forEach((node2) => declarePattern(node2.id));
+        } else if (((_b2 = child.declaration) == null ? void 0 : _b2.type) === "FunctionDeclaration") {
+          declareLocal(child.declaration.id);
+        }
     }
+  }
+  return declarations;
+}
+function findTopLevelDeclarations(node) {
+  var _a2, _b2;
+  const declarations = [];
+  function declareLocal(node2) {
+    declarations.push(node2.name);
+  }
+  function declarePattern(node2) {
+    switch (node2.type) {
+      case "Identifier":
+        declareLocal(node2);
+        break;
+      case "ObjectPattern":
+        node2.properties.forEach((node3) => declarePattern(node3.type === "Property" ? node3.value : node3));
+        break;
+      case "ArrayPattern":
+        node2.elements.forEach((node3) => node3 && declarePattern(node3));
+        break;
+      case "RestElement":
+        declarePattern(node2.argument);
+        break;
+      case "AssignmentPattern":
+        declarePattern(node2.left);
+        break;
+    }
+  }
+  switch (node.type) {
+    case "VariableDeclaration":
+      node.declarations.forEach((child) => declarePattern(child.id));
+      break;
+    case "ClassDeclaration":
+    case "FunctionDeclaration":
+      declareLocal(node.id);
+      break;
+    case "ExportNamedDeclaration":
+      if (((_a2 = node.declaration) == null ? void 0 : _a2.type) === "VariableDeclaration") {
+        node.declaration.declarations.forEach((child) => declarePattern(child.id));
+      } else if (((_b2 = node.declaration) == null ? void 0 : _b2.type) === "FunctionDeclaration") {
+        declareLocal(node.declaration.id);
+      }
   }
   return declarations;
 }
@@ -6699,16 +6768,25 @@ function isScope(node) {
 function isBlockScope(node) {
   return node.type === "BlockStatement" || node.type === "SwitchStatement" || node.type === "ForInStatement" || node.type === "ForOfStatement" || node.type === "ForStatement" || isScope(node);
 }
-function findReferences(node, {
-  globals = defaultGlobals,
-  filterDeclaration = () => true
-} = {}) {
+function isCombinatorOf(node, cls, sels) {
+  const callee = node.callee;
+  const names = cls === "Any" ? ["Behaviors", "Events"] : [cls];
+  if (callee.type === "MemberExpression" && callee.object.type === "Identifier") {
+    if (names.includes(callee.object.name)) {
+      if (callee.property.type === "Identifier" && (sels === "any" || sels.includes(callee.property.name))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+function findReferences(node, { filterDeclaration = () => true } = {}) {
   const locals = /* @__PURE__ */ new Map();
   const references = [];
   const sendTarget = [];
-  function hasLocal(node2, name2) {
+  function hasLocal(node2, name) {
     const l2 = locals.get(node2);
-    return l2 ? l2.has(name2) : false;
+    return l2 ? l2.has(name) : false;
   }
   function declareLocal(node2, id) {
     if (!filterDeclaration(id)) return;
@@ -6783,28 +6861,23 @@ function findReferences(node, {
       node2.specifiers.forEach((specifier) => declareLocal(root, specifier.local));
     },
     CallExpression(node2) {
-      const callee = node2.callee;
-      if (callee.type === "MemberExpression" && callee.object.type === "Identifier") {
-        if (callee.object.name === "Events") {
-          if (callee.property.type === "Identifier" && callee.property.name === "send") {
-            const arg = node2.arguments[0];
-            if (arg.type === "Identifier") {
-              sendTarget.push(arg);
-            }
-          }
+      if (isCombinatorOf(node2, "Events", ["send"])) {
+        const arg = node2.arguments[0];
+        if (arg.type === "Identifier") {
+          sendTarget.push(arg);
         }
       }
     }
   });
   function identifier(node2, _state, parents) {
-    const name2 = node2.name;
-    if (name2 === "undefined") return;
+    const name = node2.name;
+    if (name === "undefined") return;
     for (let i2 = parents.length - 2; i2 >= 0; --i2) {
-      if (hasLocal(parents[i2], name2)) {
+      if (hasLocal(parents[i2], name)) {
         return;
       }
     }
-    if (!globals.has(name2)) {
+    if (globals[name] !== false) {
       references.push(node2);
     }
   }
@@ -6817,41 +6890,58 @@ function findReferences(node, {
     Identifier: identifier
   });
   const forceVars = [];
+  const extraType = {};
   simple(node, {
     CallExpression(node2) {
-      const callee = node2.callee;
-      if (callee.type === "MemberExpression" && callee.object.type === "Identifier") {
-        if (callee.object.name === "Events") {
-          if (callee.property.type === "Identifier" && callee.property.name === "or") {
-            for (const arg of node2.arguments) {
-              if (arg.type === "Identifier") {
-                forceVars.push(arg);
-              }
-            }
+      if (isCombinatorOf(node2, "Events", ["or", "_or_index", "some"])) {
+        for (const arg of node2.arguments) {
+          if (arg.type === "Identifier") {
+            forceVars.push(arg);
           }
-        } else if (callee.object.name === "Behaviors") {
-          if (callee.property.type === "Identifier" && callee.property.name === "collect") {
-            const arg = node2.arguments[1];
-            if (arg.type === "Identifier") {
-              forceVars.push(arg);
-            }
+        }
+      } else if (isCombinatorOf(node2, "Behaviors", ["collect"])) {
+        const arg = node2.arguments[1];
+        if (arg.type === "Identifier") {
+          forceVars.push(arg);
+        }
+      } else if (isCombinatorOf(node2, "Behaviors", ["_select"])) {
+        if (node2.arguments[1].type === "Identifier") {
+          const name = node2.arguments[1].name;
+          if (/^_[0-9]/.exec(name)) {
+            forceVars.push(node2.arguments[1]);
+          }
+          extraType["isSelect"] = true;
+        }
+      } else if (isCombinatorOf(node2, "Behaviors", ["gather"])) {
+        extraType["gather"] = node2.arguments[0].value;
+      } else if (isCombinatorOf(node2, "Behaviors", ["or", "_or_index", "some"])) {
+        for (const arg of node2.arguments) {
+          if (arg.type === "Identifier") {
+            forceVars.push(arg);
           }
         }
       }
     }
   });
-  return [references, forceVars, sendTarget];
+  return [references, forceVars, sendTarget, extraType];
 }
-function checkNested(node, baseId) {
-  return rewriteNestedCalls(node, baseId);
-}
-function rewriteNestedCalls(body, baseId) {
+function checkNested(body, baseId) {
   const rewriteSpecs = [];
   ancestor(body, {
     CallExpression(node, ancestors) {
       const inFunction = hasFunctionDeclaration(node, ancestors);
-      const isEvent = isNonTopEvent(node, ancestors);
-      if (isEvent && !inFunction) {
+      const isEmbeddedCombinator = isNonTopCombinator(node, ancestors);
+      const isSelectCall = isSelect(node);
+      const isOrCall = isOr(node);
+      if (isSelectCall) {
+        const rewrite = rewriteSelect(node);
+        rewriteSpecs.unshift(rewrite);
+      }
+      if (isOrCall) {
+        const rewrites = rewriteOr(node, baseId, rewriteSpecs);
+        rewriteSpecs.push(...rewrites);
+      }
+      if (isEmbeddedCombinator && !inFunction) {
         rewriteSpecs.push({ start: node.start, end: node.end, name: `_${baseId}_${rewriteSpecs.length}`, type: "range" });
       }
     },
@@ -6874,17 +6964,79 @@ function rewriteNestedCalls(body, baseId) {
           }
         }
       }
+      if (isTopArrayDeclaration(node, ancestors) && node.init) {
+        const baseName = `_${baseId}_${rewriteSpecs.length}`;
+        rewriteSpecs.push({ start: node.init.start, end: node.init.end, name: baseName, type: "range" });
+        const id = node.id;
+        const elements = id.elements;
+        for (let ind = 0; ind < elements.length; ind++) {
+          const element = elements[ind];
+          if (!element) {
+            return;
+          }
+          if (element.type === "RestElement") {
+            console.log("unsupported style of assignment");
+            continue;
+          }
+          const p2 = element;
+          if (p2.type === "Identifier") {
+            rewriteSpecs.push({ definition: `const ${p2.name} = ${baseName}[${ind}]`, type: "override" });
+          } else {
+            console.log("unsupported style of assignment");
+          }
+        }
+      }
     }
   });
   return rewriteSpecs;
 }
-function isNonTopEvent(node, ancestors) {
+function rewriteSelect(node, _ancestors) {
+  const triggers = [];
+  const funcs = [];
+  for (let i2 = 1; i2 < node.arguments.length; i2 += 2) {
+    triggers.push({ start: node.arguments[i2].start, end: node.arguments[i2].end });
+  }
+  for (let i2 = 2; i2 < node.arguments.length; i2 += 2) {
+    funcs.push({ start: node.arguments[i2].start, end: node.arguments[i2].end });
+  }
+  const init = { start: node.arguments[0].start, end: node.arguments[0].end };
+  const classType = node.callee.object.name === "Events" ? "Events" : "Behaviors";
+  return { type: "select", classType, init, triggers, funcs };
+}
+function rewriteOr(node, baseId, rewriteSpecs) {
+  const triggers = [];
+  for (let i2 = 0; i2 < node.arguments.length; i2++) {
+    const child = node.arguments[i2];
+    if (child.type === "Identifier") {
+      continue;
+    }
+    const maybeName = `_${baseId}_${triggers.length + rewriteSpecs.length}`;
+    triggers.push({
+      type: "range",
+      name: maybeName,
+      start: child.start,
+      end: child.end
+    });
+  }
+  return triggers;
+}
+function isNonTopCombinator(node, ancestors) {
   if (node.type !== "CallExpression") {
     return false;
   }
-  const call = node = node;
-  const callee = call.callee;
-  return callee.type === "MemberExpression" && callee.object.type === "Identifier" && (callee.object.name === "Events" || callee.object.name === "Behaviors") && callee.property.type === "Identifier" && ancestors.length > 2 && ancestors[ancestors.length - 2].type !== "VariableDeclarator";
+  return isCombinatorOf(node, "Any", "any") && ancestors.length > 2 && ancestors[ancestors.length - 2].type !== "VariableDeclarator";
+}
+function isSelect(node, _ancestors) {
+  if (node.type !== "CallExpression") {
+    return false;
+  }
+  return isCombinatorOf(node, "Any", ["select"]);
+}
+function isOr(node, _ancestors) {
+  if (node.type !== "CallExpression") {
+    return false;
+  }
+  return isCombinatorOf(node, "Any", ["or", "_or_index", "some"]);
 }
 function hasFunctionDeclaration(_node, ancestors) {
   return !!ancestors.find((a2) => a2.type === "ArrowFunctionExpression");
@@ -6892,791 +7044,8 @@ function hasFunctionDeclaration(_node, ancestors) {
 function isTopObjectDeclaration(node, ancestors) {
   return node.type === "VariableDeclarator" && node.id.type === "ObjectPattern" && ancestors.length === 3;
 }
-const acornOptions = {
-  ecmaVersion: 13,
-  sourceType: "module"
-};
-function findDecls(input) {
-  try {
-    const body = parseProgram(input);
-    const list2 = body.body;
-    return list2.map((decl) => input.slice(decl.start, decl.end));
-  } catch (error) {
-    const e = error;
-    console.log(e.message, ": error around -> ", `"${input.slice(e.pos - 30, e.pos + 30)}"`);
-    return [];
-  }
-}
-function parseJavaScript(input, initialId, flattened = false) {
-  var _a2;
-  const decls = findDecls(input);
-  const allReferences = [];
-  let id = initialId;
-  for (const decl of decls) {
-    id++;
-    const b2 = parseProgram(decl);
-    const [references, forceVars, sendTargets] = findReferences(b2);
-    checkAssignments(b2, references, input);
-    const declarations = findDeclarations(b2, input);
-    const rewriteSpecs = flattened ? [] : checkNested(b2, id);
-    if (rewriteSpecs.length === 0) {
-      const myId = ((_a2 = declarations[0]) == null ? void 0 : _a2.name) || `${id}`;
-      allReferences.push({
-        id: myId,
-        body: b2,
-        declarations,
-        references,
-        forceVars,
-        sendTargets,
-        imports: [],
-        expression: false,
-        input: decl
-      });
-    } else {
-      let newInput = decl;
-      let newPart = "";
-      let overridden = false;
-      for (let i2 = 0; i2 < rewriteSpecs.length; i2++) {
-        const spec = rewriteSpecs[i2];
-        if (spec.type === "range") {
-          const sub = newInput.slice(spec.start, spec.end);
-          const varName = spec.name;
-          newPart += `const ${varName} = ${sub};
-`;
-          let length = spec.end - spec.start;
-          const newNewInput = `${newInput.slice(0, spec.start)}${spec.name.padEnd(length, " ")}${newInput.slice(spec.end)}`;
-          if (newNewInput.length !== decl.length) {
-            debugger;
-          }
-          newInput = newNewInput;
-        } else if (spec.type === "override") {
-          overridden = true;
-          newPart += spec.definition + "\n";
-        }
-      }
-      allReferences.push(...parseJavaScript(`${newPart}${overridden ? "" : "\n" + newInput}`, initialId, true));
-    }
-  }
-  return allReferences;
-}
-function parseProgram(input) {
-  return Parser.parse(input, acornOptions);
-}
-function parseJSX(input) {
-  return Parser.extend(jsx()).parse(input, { ecmaVersion: 13 });
-}
-class Sourcemap {
-  constructor(input) {
-    __publicField(this, "input");
-    __publicField(this, "_edits");
-    this.input = input;
-    this._edits = [];
-  }
-  _bisectLeft(index) {
-    let lo = 0;
-    let hi = this._edits.length;
-    while (lo < hi) {
-      const mid = lo + hi >>> 1;
-      if (this._edits[mid].start < index) lo = mid + 1;
-      else hi = mid;
-    }
-    return lo;
-  }
-  _bisectRight(index) {
-    let lo = 0;
-    let hi = this._edits.length;
-    while (lo < hi) {
-      const mid = lo + hi >>> 1;
-      if (this._edits[mid].start > index) hi = mid;
-      else lo = mid + 1;
-    }
-    return lo;
-  }
-  insertLeft(index, value) {
-    return this.replaceLeft(index, index, value);
-  }
-  insertRight(index, value) {
-    return this.replaceRight(index, index, value);
-  }
-  delete(start, end) {
-    return this.replaceRight(start, end, "");
-  }
-  replaceLeft(start, end, value) {
-    return this._edits.splice(this._bisectLeft(start), 0, { start, end, value }), this;
-  }
-  replaceRight(start, end, value) {
-    return this._edits.splice(this._bisectRight(start), 0, { start, end, value }), this;
-  }
-  translate(position) {
-    let index = 0;
-    let ci = { line: 1, column: 0 };
-    let co = { line: 1, column: 0 };
-    for (const { start, end, value } of this._edits) {
-      if (start > index) {
-        const l22 = positionLength(this.input, index, start);
-        const ci22 = positionAdd(ci, l22);
-        const co22 = positionAdd(co, l22);
-        if (positionCompare(co22, position) > 0) break;
-        ci = ci22;
-        co = co22;
-      }
-      const il = positionLength(this.input, start, end);
-      const ol = positionLength(value);
-      const ci2 = positionAdd(ci, il);
-      const co2 = positionAdd(co, ol);
-      if (positionCompare(co2, position) > 0) return ci;
-      ci = ci2;
-      co = co2;
-      index = end;
-    }
-    const l2 = positionSubtract(position, co);
-    return positionAdd(ci, l2);
-  }
-  trim() {
-    const input = this.input;
-    if (input.startsWith("\n")) this.delete(0, 1);
-    if (input.endsWith("\n")) this.delete(input.length - 1, input.length);
-    return this;
-  }
-  toString() {
-    let output = "";
-    let index = 0;
-    for (const { start, end, value } of this._edits) {
-      if (start > index) output += this.input.slice(index, start);
-      output += value;
-      index = end;
-    }
-    output += this.input.slice(index);
-    return output;
-  }
-}
-function positionCompare(a2, b2) {
-  return a2.line - b2.line || a2.column - b2.column;
-}
-function positionLength(input, start = 0, end = input.length) {
-  let match;
-  let line = 0;
-  lineBreakG.lastIndex = start;
-  while ((match = lineBreakG.exec(input)) && match.index < end) {
-    ++line;
-    start = match.index + match[0].length;
-  }
-  return { line, column: end - start };
-}
-function positionSubtract(b2, a2) {
-  return b2.line === a2.line ? { line: 0, column: b2.column - a2.column } : { line: b2.line - a2.line, column: b2.column };
-}
-function positionAdd(p2, l2) {
-  return l2.line === 0 ? { line: p2.line, column: p2.column + l2.column } : { line: p2.line + l2.line, column: l2.column };
-}
-const renkonGlobals = /* @__PURE__ */ new Set([
-  "Events",
-  "Behaviors",
-  "Renkon"
-]);
-function transpileJavaScript(node) {
-  var _a2;
-  const outputs = Array.from(new Set((_a2 = node.declarations) == null ? void 0 : _a2.map((r) => r.name)));
-  const only = outputs.length === 0 ? "" : outputs[0];
-  const inputs = Array.from(new Set(node.references.map((r) => r.name))).filter((n2) => {
-    return !defaultGlobals.has(n2) && !renkonGlobals.has(n2) && !(node.sendTargets.findIndex((s) => s.name === n2) >= 0);
-  });
-  const forceVars = Array.from(new Set(node.forceVars.map((r) => r.name))).filter((n2) => !defaultGlobals.has(n2) && !renkonGlobals.has(n2));
-  const output = new Sourcemap(node.input).trim();
-  rewriteRenkonCalls(output, node.body);
-  output.insertLeft(0, `, body: (${inputs}) => {
-`);
-  output.insertLeft(0, `, outputs: ${JSON.stringify(only)}`);
-  output.insertLeft(0, `, inputs: ${JSON.stringify(inputs)}`);
-  output.insertLeft(0, `, forceVars: ${JSON.stringify(forceVars)}`);
-  output.insertLeft(0, `{id: "${node.id}"`);
-  output.insertRight(node.input.length, `
-return ${only};`);
-  output.insertRight(node.input.length, "\n}};\n");
-  return String(output);
-}
-function getFunctionBody(input, forMerge) {
-  const compiled = parseJavaScript(input, 0, true);
-  const node = compiled[0].body.body[0];
-  const params = node.params.map((p2) => p2.name);
-  const body = node.body.body;
-  const last = body[body.length - 1];
-  const returnArray = forMerge ? [] : getArray(last);
-  const output = new Sourcemap(input).trim();
-  output.delete(0, body[0].start);
-  output.delete(last.start, input.length);
-  return { params, returnArray, output: String(output) };
-}
-function getArray(returnNode) {
-  if (returnNode.type !== "ReturnStatement") {
-    console.error("cannot convert");
-    return null;
-  }
-  const array = returnNode.argument;
-  if (!array || array.type !== "ArrayExpression") {
-    console.error("cannot convert");
-    return null;
-  }
-  for (const elem of array.elements) {
-    if (!elem || elem.type !== "Identifier") {
-      console.error("cannot convert");
-      return null;
-    }
-  }
-  return array.elements.map((e) => e.name);
-}
-function quote(node, output) {
-  output.insertLeft(node.start, '"');
-  output.insertRight(node.end, '"');
-}
-function rewriteRenkonCalls(output, body) {
-  simple(body, {
-    CallExpression(node) {
-      const callee = node.callee;
-      if (callee.type === "MemberExpression" && callee.object.type === "Identifier") {
-        if (callee.object.name === "Events") {
-          output.insertRight(callee.object.end, ".create(Renkon)");
-          if (callee.property.type === "Identifier") {
-            if (callee.property.name === "delay") {
-              quote(node.arguments[0], output);
-            } else if (callee.property.name === "or") {
-              for (const arg of node.arguments) {
-                quote(arg, output);
-              }
-            } else if (callee.property.name === "send") {
-              quote(node.arguments[0], output);
-            } else if (callee.property.name === "collect") {
-              quote(node.arguments[1], output);
-            }
-          }
-        } else if (callee.object.name === "Behaviors") {
-          output.insertRight(callee.object.end, ".create(Renkon)");
-          if (callee.property.type === "Identifier") {
-            if (callee.property.name === "collect") {
-              quote(node.arguments[1], output);
-            }
-          }
-        }
-      }
-    }
-  });
-}
-const name = "renkon-core";
-const version$1 = "0.2.10";
-const type = "module";
-const license = "MIT";
-const files = [
-  "dist"
-];
-const main = "dist/renkon-core.js";
-const scripts = {
-  vite: "vite",
-  build: "vite build",
-  prepublish: "npm run build"
-};
-const devDependencies = {
-  "@typescript-eslint/eslint-plugin": "^7.11.0",
-  "@typescript-eslint/parser": "^7.11.0",
-  "npm-run-all": "^4.1.5",
-  vite: "^5.2.0"
-};
-const dependencies = {
-  acorn: "^8.11.3",
-  "acorn-jsx": "^5.3.2",
-  "acorn-typescript": "^1.4.13",
-  "acorn-walk": "^8.3.2"
-};
-const packageJson = {
-  name,
-  version: version$1,
-  type,
-  license,
-  files,
-  main,
-  scripts,
-  devDependencies,
-  dependencies
-};
-const typeKey = Symbol("typeKey");
-const isBehaviorKey = Symbol("isBehavior");
-const eventType = "EventType";
-const delayType = "DelayType";
-const timerType = "TimerType";
-const collectType = "CollectType";
-const promiseType = "PromiseType";
-const behaviorType = "BehaviorType";
-const orType = "OrType";
-const sendType = "SendType";
-const receiverType = "ReceiverType";
-const changeType = "ChangeType";
-const generatorNextType = "GeneratorNextType";
-const resolvePartType = "ResolvePart";
-_b = typeKey, _a = isBehaviorKey;
-class Stream {
-  constructor(type2, isBehavior) {
-    __publicField(this, _b);
-    __publicField(this, _a);
-    this[typeKey] = type2;
-    this[isBehaviorKey] = isBehavior;
-  }
-  created(_state, _id) {
-    return this;
-  }
-  ready(node, state) {
-    var _a2;
-    for (const inputName of node.inputs) {
-      const varName = state.baseVarName(inputName);
-      const resolved = (_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value;
-      if (resolved === void 0 && !node.forceVars.includes(inputName)) {
-        return false;
-      }
-    }
-    return true;
-  }
-  evaluate(_state, _node, _inputArray, _lastInputArray) {
-    return;
-  }
-  conclude(state, varName) {
-    const inputArray = state.inputArray.get(varName);
-    const inputs = state.nodes.get(varName).inputs;
-    if (!inputArray || !inputs) {
-      return;
-    }
-    for (let i2 = 0; i2 < inputs.length; i2++) {
-      const resolved = state.resolved.get(inputs[i2]);
-      if (resolved === void 0) {
-        inputArray[i2] = void 0;
-      }
-    }
-    return;
-  }
-}
-class DelayedEvent extends Stream {
-  constructor(delay, varName, isBehavior) {
-    super(delayType, isBehavior);
-    __publicField(this, "delay");
-    __publicField(this, "varName");
-    this.delay = delay;
-    this.varName = varName;
-  }
-  ready(node, state) {
-    const output = node.outputs;
-    const scratch = state.scratch.get(output);
-    if ((scratch == null ? void 0 : scratch.queue.length) > 0) {
-      return true;
-    }
-    return state.defaultReady(node);
-  }
-  created(state, id) {
-    if (!state.scratch.get(id)) {
-      state.scratch.set(id, { queue: [] });
-    }
-    return this;
-  }
-  evaluate(state, node, inputArray, lastInputArray) {
-    const value = state.spliceDelayedQueued(state.scratch.get(node.id), state.time);
-    if (value !== void 0) {
-      state.setResolved(node.id, { value, time: state.time });
-    }
-    const inputIndex = 0;
-    const myInput = inputArray[inputIndex];
-    const doIt = this[isBehaviorKey] && myInput !== void 0 && myInput !== (lastInputArray == null ? void 0 : lastInputArray[inputIndex]) || !this[isBehaviorKey] && myInput !== void 0;
-    if (doIt) {
-      const scratch = state.scratch.get(node.id);
-      scratch.queue.push({ time: state.time + this.delay, value: myInput });
-    }
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (this[isBehaviorKey]) {
-      return;
-    }
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class TimerEvent extends Stream {
-  constructor(interval, isBehavior) {
-    super(timerType, isBehavior);
-    __publicField(this, "interval");
-    this.interval = interval;
-  }
-  created(_state, _id) {
-    return this;
-  }
-  ready(node, state) {
-    const output = node.outputs;
-    const last = state.scratch.get(output);
-    const interval = this.interval;
-    return last === void 0 || last + interval <= state.time;
-  }
-  evaluate(state, node, _inputArray, _lastInputArray) {
-    const interval = this.interval;
-    const logicalTrigger = interval * Math.floor(state.time / interval);
-    state.setResolved(node.id, { value: logicalTrigger, time: state.time });
-    state.scratch.set(node.id, logicalTrigger);
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (this[isBehaviorKey]) {
-      return;
-    }
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class PromiseEvent extends Stream {
-  constructor(promise) {
-    super(promiseType, true);
-    __publicField(this, "promise");
-    this.promise = promise;
-  }
-  created(state, id) {
-    var _a2;
-    const oldPromise = (_a2 = state.scratch.get(id)) == null ? void 0 : _a2.promise;
-    const promise = this.promise;
-    if (oldPromise && promise !== oldPromise) {
-      state.resolved.delete(id);
-    }
-    promise.then((value) => {
-      var _a3;
-      const wasResolved = (_a3 = state.resolved.get(id)) == null ? void 0 : _a3.value;
-      if (!wasResolved) {
-        state.scratch.set(id, { promise });
-        state.setResolved(id, { value, time: state.time });
-      }
-    });
-    return this;
-  }
-}
-class OrEvent extends Stream {
-  constructor(varNames) {
-    super(orType, false);
-    __publicField(this, "varNames");
-    this.varNames = varNames;
-  }
-  evaluate(state, node, inputArray, _lastInputArray) {
-    for (let i2 = 0; i2 < node.inputs.length; i2++) {
-      const myInput = inputArray[i2];
-      if (myInput !== void 0) {
-        state.setResolved(node.id, { value: myInput, time: state.time });
-        return;
-      }
-    }
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class UserEvent extends Stream {
-  constructor(record, queued) {
-    super(eventType, false);
-    __publicField(this, "record");
-    __publicField(this, "queued");
-    this.record = record;
-    this.queued = !!queued;
-  }
-  created(state, id) {
-    let oldRecord = state.scratch.get(id);
-    if (oldRecord && oldRecord.cleanup && typeof oldRecord.cleanup === "function") {
-      oldRecord.cleanup();
-      oldRecord.cleanup = void 0;
-    }
-    state.scratch.set(id, this.record);
-    return this;
-  }
-  evaluate(state, node, _inputArray, _lastInputArray) {
-    let newValue;
-    if (this.queued) {
-      newValue = state.getEventValues(state.scratch.get(node.id), state.time);
-    } else {
-      newValue = state.getEventValue(state.scratch.get(node.id), state.time);
-    }
-    if (newValue !== void 0) {
-      if (newValue !== null && newValue.then) {
-        newValue.then((value) => {
-          state.setResolved(node.id, { value, time: state.time });
-        });
-      } else {
-        state.setResolved(node.id, { value: newValue, time: state.time });
-      }
-    }
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class SendEvent extends Stream {
-  constructor() {
-    super(sendType, false);
-  }
-}
-class ReceiverEvent extends Stream {
-  constructor(value) {
-    super(receiverType, false);
-    __publicField(this, "value");
-    this.value = value;
-  }
-  created(state, id) {
-    if (this.value !== void 0) {
-      state.scratch.set(id, this.value);
-    }
-    return this;
-  }
-  evaluate(state, node, _inputArray, _lastInputArray) {
-    const value = state.scratch.get(node.id);
-    if (value !== void 0) {
-      state.setResolved(node.id, { value, time: state.time });
-    }
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      state.scratch.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class ChangeEvent extends Stream {
-  constructor(value) {
-    super(changeType, false);
-    __publicField(this, "value");
-    this.value = value;
-  }
-  created(state, id) {
-    state.scratch.set(id, this.value);
-    return this;
-  }
-  ready(node, state) {
-    var _a2;
-    const resolved = (_a2 = state.resolved.get(state.baseVarName(node.inputs[0]))) == null ? void 0 : _a2.value;
-    if (resolved !== void 0 && resolved === state.scratch.get(node.id)) {
-      return false;
-    }
-    return state.defaultReady(node);
-  }
-  evaluate(state, node, inputArray, _lastInputArray) {
-    state.setResolved(node.id, { value: this.value, time: state.time });
-    state.scratch.set(node.id, inputArray[0]);
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class Behavior extends Stream {
-  constructor() {
-    super(behaviorType, true);
-  }
-}
-class CollectStream extends Stream {
-  constructor(init, varName, updater, isBehavior) {
-    super(collectType, isBehavior);
-    __publicField(this, "init");
-    __publicField(this, "varName");
-    __publicField(this, "updater");
-    this.init = init;
-    this.varName = varName;
-    this.updater = updater;
-  }
-  created(state, id) {
-    if (this.init && typeof this.init === "object" && this.init.then) {
-      this.init.then((value) => {
-        state.streams.set(id, this);
-        this.init = value;
-        state.setResolved(id, { value, time: state.time });
-        state.scratch.set(id, { current: this.init });
-      });
-      return this;
-    }
-    if (!state.scratch.get(id)) {
-      state.streams.set(id, this);
-      state.setResolved(id, { value: this.init, time: state.time });
-      state.scratch.set(id, { current: this.init });
-    }
-    return this;
-  }
-  evaluate(state, node, inputArray, lastInputArray) {
-    const scratch = state.scratch.get(node.id);
-    if (!scratch) {
-      return;
-    }
-    const inputIndex = node.inputs.indexOf(this.varName);
-    const inputValue = inputArray[inputIndex];
-    if (inputValue !== void 0 && (!lastInputArray || inputValue !== lastInputArray[inputIndex])) {
-      const newValue = this.updater(scratch.current, inputValue);
-      if (newValue !== void 0) {
-        if (newValue !== null && newValue.then) {
-          newValue.then((value) => {
-            state.setResolved(node.id, { value, time: state.time });
-            state.scratch.set(node.id, { current: value });
-          });
-        } else {
-          state.setResolved(node.id, { value: newValue, time: state.time });
-          state.scratch.set(node.id, { current: newValue });
-        }
-      }
-    }
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (this[isBehaviorKey]) {
-      return;
-    }
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class ResolvePart extends Stream {
-  constructor(object, isBehavior) {
-    super(resolvePartType, isBehavior);
-    __publicField(this, "promise");
-    __publicField(this, "indices");
-    __publicField(this, "resolved");
-    __publicField(this, "object");
-    this.object = object;
-    if (Array.isArray(this.object)) {
-      const array = this.object;
-      const indices = [...Array(array.length).keys()].filter((i2) => {
-        const elem = this.object[i2];
-        return typeof elem === "object" && elem !== null && elem.then;
-      });
-      const promises = indices.map((i2) => array[i2]);
-      this.promise = Promise.all(promises);
-      this.indices = indices;
-    } else {
-      const keys = Object.keys(this.object).filter((k2) => {
-        const elem = this.object[k2];
-        return typeof elem === "object" && elem !== null && elem.then;
-      });
-      const promises = keys.map((k2) => this.object[k2]);
-      this.promise = Promise.all(promises);
-      this.indices = keys;
-    }
-    this.resolved = false;
-  }
-  created(state, id) {
-    if (!this.resolved) {
-      this.promise.then((values) => {
-        var _a2;
-        const wasResolved = (_a2 = state.resolved.get(id)) == null ? void 0 : _a2.value;
-        if (!wasResolved) {
-          this.resolved = true;
-          if (Array.isArray(this.object)) {
-            const result = [...this.object];
-            const indices = this.indices;
-            for (let i2 of indices) {
-              result[indices[i2]] = values[i2];
-            }
-            state.setResolved(id, { value: result, time: state.time });
-            return result;
-          } else {
-            const result = { ...this.object };
-            const indices = this.indices;
-            for (let i2 = 0; i2 < indices.length; i2++) {
-              result[indices[i2]] = values[i2];
-            }
-            state.setResolved(id, { value: result, time: state.time });
-            return result;
-          }
-        }
-      });
-    }
-    return this;
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    if (this[isBehaviorKey]) {
-      return;
-    }
-    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
-}
-class GeneratorNextEvent extends Stream {
-  constructor(generator) {
-    super(generatorNextType, false);
-    __publicField(this, "promise");
-    __publicField(this, "generator");
-    const promise = generator.next();
-    this.promise = promise;
-    this.generator = generator;
-  }
-  created(state, id) {
-    if (this.generator.done) {
-      return this;
-    }
-    const promise = this.promise;
-    promise.then((value) => {
-      var _a2;
-      const wasResolved = (_a2 = state.resolved.get(id)) == null ? void 0 : _a2.value;
-      if (!wasResolved) {
-        state.setResolved(id, { value, time: state.time });
-      }
-    });
-    return this;
-  }
-  conclude(state, varName) {
-    var _a2;
-    super.conclude(state, varName);
-    const value = (_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value;
-    if (value !== void 0) {
-      if (!value.done) {
-        if (!this.generator.done) {
-          const promise = this.generator.next();
-          promise.then((value2) => {
-            var _a3;
-            const wasResolved = (_a3 = state.resolved.get(varName)) == null ? void 0 : _a3.value;
-            if (!wasResolved) {
-              state.setResolved(varName, { value: value2, time: state.time });
-            }
-          });
-          this.promise = promise;
-        }
-      } else {
-        this.generator.done = true;
-      }
-      state.resolved.delete(varName);
-      return varName;
-    }
-    return;
-  }
+function isTopArrayDeclaration(node, ancestors) {
+  return node.type === "VariableDeclarator" && node.id.type === "ArrayPattern" && ancestors.length === 3;
 }
 function a(t2, e) {
   for (var s = 0; s < e.length; s++) {
@@ -9595,6 +8964,110 @@ function D(e) {
     return z;
   };
 }
+class Sourcemap {
+  constructor(input) {
+    __publicField(this, "input");
+    __publicField(this, "_edits");
+    this.input = input;
+    this._edits = [];
+  }
+  _bisectLeft(index) {
+    let lo = 0;
+    let hi = this._edits.length;
+    while (lo < hi) {
+      const mid = lo + hi >>> 1;
+      if (this._edits[mid].start < index) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+  _bisectRight(index) {
+    let lo = 0;
+    let hi = this._edits.length;
+    while (lo < hi) {
+      const mid = lo + hi >>> 1;
+      if (this._edits[mid].start > index) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+  insertLeft(index, value) {
+    return this.replaceLeft(index, index, value);
+  }
+  insertRight(index, value) {
+    return this.replaceRight(index, index, value);
+  }
+  delete(start, end) {
+    return this.replaceRight(start, end, "");
+  }
+  replaceLeft(start, end, value) {
+    return this._edits.splice(this._bisectLeft(start), 0, { start, end, value }), this;
+  }
+  replaceRight(start, end, value) {
+    return this._edits.splice(this._bisectRight(start), 0, { start, end, value }), this;
+  }
+  translate(position) {
+    let index = 0;
+    let ci = { line: 1, column: 0 };
+    let co = { line: 1, column: 0 };
+    for (const { start, end, value } of this._edits) {
+      if (start > index) {
+        const l22 = positionLength(this.input, index, start);
+        const ci22 = positionAdd(ci, l22);
+        const co22 = positionAdd(co, l22);
+        if (positionCompare(co22, position) > 0) break;
+        ci = ci22;
+        co = co22;
+      }
+      const il = positionLength(this.input, start, end);
+      const ol = positionLength(value);
+      const ci2 = positionAdd(ci, il);
+      const co2 = positionAdd(co, ol);
+      if (positionCompare(co2, position) > 0) return ci;
+      ci = ci2;
+      co = co2;
+      index = end;
+    }
+    const l2 = positionSubtract(position, co);
+    return positionAdd(ci, l2);
+  }
+  trim() {
+    const input = this.input;
+    if (input.startsWith("\n")) this.delete(0, 1);
+    if (input.endsWith("\n")) this.delete(input.length - 1, input.length);
+    return this;
+  }
+  toString() {
+    let output = "";
+    let index = 0;
+    for (const { start, end, value } of this._edits) {
+      if (start > index) output += this.input.slice(index, start);
+      output += value;
+      index = end;
+    }
+    output += this.input.slice(index);
+    return output;
+  }
+}
+function positionCompare(a2, b2) {
+  return a2.line - b2.line || a2.column - b2.column;
+}
+function positionLength(input, start = 0, end = input.length) {
+  let match;
+  let line = 0;
+  lineBreakG.lastIndex = start;
+  while ((match = lineBreakG.exec(input)) && match.index < end) {
+    ++line;
+    start = match.index + match[0].length;
+  }
+  return { line, column: end - start };
+}
+function positionSubtract(b2, a2) {
+  return b2.line === a2.line ? { line: 0, column: b2.column - a2.column } : { line: b2.line - a2.line, column: b2.column };
+}
+function positionAdd(p2, l2) {
+  return l2.line === 0 ? { line: p2.line, column: p2.column + l2.column } : { line: p2.line + l2.line, column: l2.column };
+}
 function detype(input) {
   const ts = D();
   const node = Parser.extend(ts).parse(input, {
@@ -9607,20 +9080,967 @@ function detype(input) {
   return String(output);
 }
 function removeTypeNode(output, node) {
-  if (node.type.startsWith("TS")) {
-    output.delete(node.start, node.end);
+  if (Array.isArray(node)) {
+    node.forEach((a2) => removeTypeNode(output, a2));
     return;
   }
-  for (let k2 in node) {
-    let v2 = node[k2];
-    if (Array.isArray(v2)) {
-      v2.forEach((a2) => removeTypeNode(output, a2));
-      continue;
+  if (typeof node === "object" && node !== null && typeof node.type === "string") {
+    if (node.type.startsWith("TS")) {
+      output.delete(node.start, node.end);
+      return;
     }
-    if (typeof v2 === "object" && v2 !== null && v2 instanceof Node) {
+    for (let k2 in node) {
+      let v2 = node[k2];
       removeTypeNode(output, v2);
+    }
+  }
+}
+const acornOptions = {
+  ecmaVersion: 13,
+  sourceType: "module"
+};
+function findDecls(input) {
+  const body = parseProgram(input);
+  const list2 = body.body;
+  return list2.map((decl) => {
+    const decls = findTopLevelDeclarations(decl);
+    return {
+      code: input.slice(decl.start, decl.end),
+      start: decl.start,
+      end: decl.end,
+      decls
+    };
+  });
+}
+function isCompilerArtifact(b2) {
+  if (b2.type !== "Program") {
+    return false;
+  }
+  if (b2.body[0].type !== "ExpressionStatement") {
+    return false;
+  }
+  if (b2.body[0].expression.type !== "Identifier") {
+    return false;
+  }
+  return /^_[0-9]/.test(b2.body[0].expression.name);
+}
+function topLevelType(b2) {
+  var _a2;
+  if (b2.type !== "Program") {
+    return "";
+  }
+  const body = b2.body[0];
+  if (body.type !== "VariableDeclaration") {
+    return "";
+  }
+  if (body.declarations[0].type !== "VariableDeclarator") {
+    return "";
+  }
+  if (body.declarations[0].id.type !== "Identifier") {
+    return "";
+  }
+  if (((_a2 = body.declarations[0].init) == null ? void 0 : _a2.type) !== "CallExpression") {
+    return "";
+  }
+  const call = body.declarations[0].init;
+  if (call.callee.type !== "MemberExpression") {
+    return "";
+  }
+  if (call.callee.object.type !== "Identifier") {
+    return "";
+  }
+  if (call.callee.object.name === "Events") {
+    return "Event";
+  }
+  if (call.callee.object.name === "Behaviors") {
+    return "Behavior";
+  }
+  return "";
+}
+function parseJavaScript(input, initialId, flattened = false) {
+  var _a2, _b2;
+  let decls;
+  try {
+    input = detype(input);
+    decls = findDecls(input).map((d2) => d2.code);
+  } catch (error) {
+    const e = error;
+    const message = e.message + `: error around -> 
+"${input.slice(e.pos - 30, e.pos + 30)}`;
+    console.log(message);
+    throw error;
+  }
+  const allReferences = [];
+  let id = initialId;
+  for (const decl of decls) {
+    id++;
+    const b2 = parseProgram(decl);
+    const [references, forceVars, sendTargets, extraType] = findReferences(b2);
+    checkAssignments(b2, references, input);
+    const declarations = findDeclarations(b2, input);
+    const rewriteSpecs = flattened ? [] : checkNested(b2, id);
+    if (isCompilerArtifact(b2)) {
       continue;
     }
+    if (rewriteSpecs.length === 0) {
+      const myId = ((_a2 = declarations[0]) == null ? void 0 : _a2.name) ? (_b2 = declarations[0]) == null ? void 0 : _b2.name : flattened ? `${initialId}` : `${id}`;
+      const topType = topLevelType(b2);
+      allReferences.push({
+        id: myId,
+        body: b2,
+        declarations,
+        references,
+        forceVars,
+        sendTargets,
+        imports: [],
+        extraType,
+        topType,
+        input: decl
+      });
+    } else {
+      let newInput = decl;
+      let newPart = "";
+      let overridden = false;
+      let again = false;
+      for (let i2 = 0; i2 < rewriteSpecs.length; i2++) {
+        const spec = rewriteSpecs[i2];
+        if (spec.type === "range") {
+          const sub = newInput.slice(spec.start, spec.end);
+          const varName = spec.name;
+          newPart += `const ${varName} = ${sub};
+`;
+          let length = spec.end - spec.start;
+          const newNewInput = `${newInput.slice(0, spec.start)}${spec.name.padEnd(length, " ")}${newInput.slice(spec.end)}`;
+          if (newNewInput.length !== decl.length) {
+            debugger;
+          }
+          newInput = newNewInput;
+        } else if (spec.type === "override") {
+          overridden = true;
+          newPart += spec.definition + "\n";
+        } else if (spec.type === "select") {
+          overridden = false;
+          const sub = spec.triggers.map((spec2) => newInput.slice(spec2.start, spec2.end));
+          const trigger = `Events._or_index(${sub.join(", ")})`;
+          const funcs = spec.funcs.map((spec2) => newInput.slice(spec2.start, spec2.end));
+          const init = newInput.slice(spec.init.start, spec.init.end);
+          const newNewInput = `const ${declarations[0].name} = ${spec.classType}._select(${init}, ${trigger}, [${funcs}]);`;
+          newInput = newNewInput;
+          again = true;
+          id++;
+          break;
+        }
+      }
+      const parsed = parseJavaScript(`${newPart}${overridden ? "" : "\n" + newInput}`, again ? id - 1 : id, !again);
+      allReferences.push(...parsed);
+    }
+  }
+  return allReferences;
+}
+function parseProgram(input) {
+  return Parser.parse(input, acornOptions);
+}
+function parseJSX(input) {
+  return Parser.extend(jsx()).parse(input, { ecmaVersion: 13 });
+}
+function transpileJavaScript(node) {
+  var _a2;
+  const outputs = Array.from(new Set((_a2 = node.declarations) == null ? void 0 : _a2.map((r) => r.name)));
+  const only = outputs.length === 0 ? "" : outputs[0];
+  const inputs = Array.from(new Set(node.references.map((r) => r.name))).filter((n2) => {
+    return globals[n2] !== false && !(node.sendTargets.findIndex((s) => s.name === n2) >= 0);
+  });
+  const forceVars = Array.from(new Set(node.forceVars.map((r) => r.name))).filter((n2) => globals[n2] !== false);
+  const output = new Sourcemap(node.input).trim();
+  rewriteExport(output, node.body);
+  rewriteRenkonCalls(output, node.body);
+  output.insertLeft(0, `, body: (${inputs}) => {
+`);
+  output.insertLeft(0, `, outputs: ${JSON.stringify(only)}`);
+  output.insertLeft(0, `, inputs: ${JSON.stringify(inputs)}`);
+  output.insertLeft(0, `, forceVars: ${JSON.stringify(forceVars)}`);
+  output.insertLeft(0, `, topType: "${node.topType}"`);
+  output.insertLeft(0, `{id: "${node.id}"`);
+  output.insertRight(node.input.length, `
+return ${only};`);
+  output.insertRight(node.input.length, "\n}};\n");
+  return String(output);
+}
+function getFunctionBody(input, forMerge) {
+  const compiled = parseJavaScript(input, 0, true);
+  const node = compiled[0].body.body[0];
+  const params = getParams(node);
+  const types2 = getTypes(node);
+  const body = node.body.body;
+  const last = body[body.length - 1];
+  const returnValues = forMerge ? {} : getReturn(last);
+  const output = new Sourcemap(input).trim();
+  output.delete(0, body[0].start);
+  output.delete(last.start, input.length);
+  return { params, types: types2, returnValues, output: String(output) };
+}
+function getParams(node) {
+  if (node.params.length === 0) {
+    return [];
+  }
+  if (node.params[0].type === "Identifier") {
+    return node.params.map((p2) => p2.name);
+  }
+  if (node.params[0].type === "ObjectPattern") {
+    const result = [];
+    for (const prop of node.params[0].properties) {
+      if (!prop) {
+        console.error("cannot convert");
+        return [];
+      }
+      if (prop.type !== "Property") {
+        console.error("cannot convert");
+        return [];
+      }
+      if (prop.key.type !== "Identifier" || prop.value.type !== "Identifier") {
+        console.error("cannot convert");
+        return [];
+      }
+      result.push(prop.key.name);
+    }
+    return result;
+  }
+  return [];
+}
+function getTypes(node) {
+  if (node.params.length < 2) {
+    return null;
+  }
+  const param = node.params[1];
+  if (param.type !== "AssignmentPattern") {
+    return null;
+  }
+  if (param.left.type !== "Identifier") {
+    return null;
+  }
+  if (param.right.type !== "ObjectExpression") {
+    return null;
+  }
+  const types2 = /* @__PURE__ */ new Map();
+  for (const prop of param.right.properties) {
+    if (!prop) {
+      continue;
+    }
+    if (prop.type !== "Property") {
+      continue;
+    }
+    if (prop.key.type !== "Identifier") {
+      continue;
+    }
+    if (prop.value.type !== "Literal") {
+      continue;
+    }
+    if (typeof prop.value.value !== "string") {
+      continue;
+    }
+    types2.set(prop.key.name, prop.value.value.startsWith("Event") ? "Event" : "Behavior");
+  }
+  return types2;
+}
+function getReturn(returnNode) {
+  if (returnNode.type !== "ReturnStatement") {
+    console.error("cannot convert");
+    return null;
+  }
+  const returnValue = returnNode.argument;
+  if (returnValue && returnValue.type === "ArrayExpression") {
+    console.log("array form no longer supported");
+    return null;
+  }
+  if (returnValue && returnValue.type === "ObjectExpression") {
+    const result = {};
+    for (const prop of returnValue.properties) {
+      if (!prop) {
+        console.error("cannot convert");
+        return null;
+      }
+      if (prop.type !== "Property") {
+        console.error("cannot convert");
+        return null;
+      }
+      if (prop.key.type !== "Identifier" || prop.value.type !== "Identifier") {
+        console.error("cannot convert");
+        return null;
+      }
+      result[prop.key.name] = prop.value.name;
+    }
+    return result;
+  }
+  return null;
+}
+function quote(node, output) {
+  output.insertLeft(node.start, '"');
+  output.insertRight(node.end, '"');
+}
+function rewriteExport(output, body) {
+  const first = body.body[0];
+  if (first.type !== "ExportNamedDeclaration") {
+    return;
+  }
+  const start = first.start;
+  const end = start + "export ".length;
+  output.replaceLeft(start, end, "");
+}
+function rewriteRenkonCalls(output, body) {
+  simple(body, {
+    CallExpression(node) {
+      const callee = node.callee;
+      if (callee.type === "MemberExpression" && callee.object.type === "Identifier") {
+        if (callee.object.name === "Events") {
+          output.insertRight(callee.object.end, ".create(Renkon)");
+          if (callee.property.type === "Identifier") {
+            const selector = callee.property.name;
+            if (selector === "delay") {
+              quote(node.arguments[0], output);
+            } else if (["or", "_or_index", "some"].includes(selector)) {
+              for (const arg of node.arguments) {
+                quote(arg, output);
+              }
+            } else if (selector === "send") {
+              quote(node.arguments[0], output);
+            } else if (["collect", "_select"].includes(selector)) {
+              output.insertLeft(node.arguments[0].start, "(() => (");
+              output.insertRight(node.arguments[0].end, "))");
+              quote(node.arguments[1], output);
+            }
+          }
+        } else if (callee.object.name === "Behaviors") {
+          output.insertRight(callee.object.end, ".create(Renkon)");
+          if (callee.property.type === "Identifier") {
+            const selector = callee.property.name;
+            if (["collect", "_select"].includes(selector)) {
+              output.insertLeft(node.arguments[0].start, "(() => (");
+              output.insertRight(node.arguments[0].end, "))");
+              quote(node.arguments[1], output);
+            } else if (["or", "_or_index", "some"].includes(selector)) {
+              for (const arg of node.arguments) {
+                quote(arg, output);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+}
+const version$1 = "0.8.8";
+const packageJson = {
+  version: version$1
+};
+const typeKey = Symbol("typeKey");
+const isBehaviorKey = Symbol("isBehavior");
+const eventType = "EventType";
+const userEventType = "UserEventType";
+const delayType = "DelayType";
+const timerType = "TimerType";
+const collectType = "CollectType";
+const selectType = "SelectType";
+const promiseType = "PromiseType";
+const behaviorType = "BehaviorType";
+const onceType = "OnceType";
+const orType = "OrType";
+const sendType = "SendType";
+const receiverType = "ReceiverType";
+const changeType = "ChangeType";
+const gatherType = "GatherType";
+const generatorNextType = "GeneratorNextType";
+const resolvePartType = "ResolvePart";
+_b = typeKey, _a = isBehaviorKey;
+class Stream {
+  constructor(type, isBehavior) {
+    __publicField(this, _b);
+    __publicField(this, _a);
+    this[typeKey] = type;
+    this[isBehaviorKey] = isBehavior;
+  }
+  created(_state, _id) {
+    return this;
+  }
+  ready(node, state) {
+    var _a2;
+    for (const inputName of node.inputs) {
+      const varName = state.baseVarName(inputName);
+      const resolved = (_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value;
+      if (resolved === void 0 && !node.forceVars.includes(inputName)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  evaluate(_state, _node, _inputArray, _lastInputArray) {
+    return;
+  }
+  conclude(state, varName) {
+    var _a2;
+    const inputArray = state.inputArray.get(varName);
+    const inputs = state.nodes.get(varName).inputs;
+    if (inputArray && inputs) {
+      for (let i2 = 0; i2 < inputs.length; i2++) {
+        const type = state.types.get(inputs[i2]);
+        if (type === "Event") {
+          inputArray[i2] = void 0;
+        }
+      }
+    }
+    if (!this[isBehaviorKey]) {
+      if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
+        state.resolved.delete(varName);
+        return varName;
+      }
+    }
+    return;
+  }
+}
+class BehaviorStream extends Stream {
+  constructor() {
+    super(behaviorType, true);
+  }
+}
+class EventStream extends Stream {
+  constructor() {
+    super(eventType, false);
+  }
+}
+class DelayedEvent extends Stream {
+  constructor(delay, varName, isBehavior) {
+    super(delayType, isBehavior);
+    __publicField(this, "delay");
+    __publicField(this, "varName");
+    this.delay = delay;
+    this.varName = varName;
+  }
+  ready(node, state) {
+    const output = node.outputs;
+    const scratch = state.scratch.get(output);
+    if ((scratch == null ? void 0 : scratch.queue.length) > 0) {
+      return true;
+    }
+    return state.defaultReady(node);
+  }
+  created(state, id) {
+    if (!state.scratch.get(id)) {
+      state.scratch.set(id, { queue: [] });
+    }
+    return this;
+  }
+  evaluate(state, node, inputArray, lastInputArray) {
+    var _a2;
+    const value = state.spliceDelayedQueued(state.scratch.get(node.id), state.time);
+    if (value !== void 0 && ((_a2 = state.resolved.get(node.id)) == null ? void 0 : _a2.value) !== value) {
+      state.setResolved(node.id, { value, time: state.time });
+    }
+    const inputIndex = 0;
+    const myInput = inputArray[inputIndex];
+    const doIt = this[isBehaviorKey] && myInput !== void 0 && myInput !== (lastInputArray == null ? void 0 : lastInputArray[inputIndex]) || !this[isBehaviorKey] && myInput !== void 0;
+    if (doIt) {
+      const scratch = state.scratch.get(node.id);
+      state.requestAlarm(this.delay);
+      scratch.queue.push({ time: state.time + this.delay, value: myInput });
+    }
+  }
+}
+class TimerEvent extends Stream {
+  constructor(interval, isBehavior) {
+    super(timerType, isBehavior);
+    __publicField(this, "interval");
+    __publicField(this, "scheduled");
+    this.interval = interval;
+    this.scheduled = -1;
+  }
+  created(_state, _id) {
+    return this;
+  }
+  ready(node, state) {
+    const output = node.outputs;
+    const last = state.scratch.get(output);
+    const interval = this.interval;
+    return last === void 0 || last + interval <= state.time;
+  }
+  evaluate(state, node, _inputArray, _lastInputArray) {
+    const interval = this.interval;
+    const logicalTrigger = interval * Math.floor(state.time / interval);
+    state.requestAlarm(this.interval);
+    state.setResolved(node.id, { value: logicalTrigger, time: state.time });
+    state.scratch.set(node.id, logicalTrigger);
+  }
+}
+class PromiseEvent extends Stream {
+  constructor(promise) {
+    super(promiseType, true);
+    __publicField(this, "promise");
+    this.promise = promise;
+  }
+  created(state, id) {
+    var _a2;
+    const oldPromise = (_a2 = state.scratch.get(id)) == null ? void 0 : _a2.promise;
+    const promise = this.promise;
+    if (oldPromise && promise !== oldPromise) {
+      state.resolved.delete(id);
+    }
+    promise.then((value) => {
+      var _a3;
+      const wasResolved = (_a3 = state.resolved.get(id)) == null ? void 0 : _a3.value;
+      if (!wasResolved) {
+        state.scratch.set(id, { promise });
+        state.requestAlarm(1);
+        state.scheduleAlarm();
+        state.setResolved(id, { value, time: state.time });
+      }
+    });
+    return this;
+  }
+}
+class OrStream extends Stream {
+  constructor(varNames, useIndex, collection, isBehavior = false) {
+    super(orType, isBehavior);
+    __publicField(this, "varNames");
+    __publicField(this, "useIndex");
+    __publicField(this, "collection");
+    this.varNames = varNames;
+    this.useIndex = useIndex;
+    this.collection = collection;
+  }
+  ready(node, state) {
+    var _a2, _b2;
+    const lastInputArray = state.inputArray.get(node.id);
+    if (!lastInputArray) {
+      for (let i2 = 0; i2 < node.inputs.length; i2++) {
+        const myInput = (_a2 = state.resolved.get(node.inputs[i2])) == null ? void 0 : _a2.value;
+        if (myInput !== void 0) {
+          return true;
+        }
+      }
+      return false;
+    }
+    for (let i2 = 0; i2 < node.inputs.length; i2++) {
+      const myInput = (_b2 = state.resolved.get(node.inputs[i2])) == null ? void 0 : _b2.value;
+      if (myInput !== void 0 && myInput !== lastInputArray[i2]) {
+        return true;
+      }
+    }
+    return false;
+  }
+  evaluate(state, node, inputArray, lastInputArray) {
+    if (this.collection) {
+      const indices = [];
+      const values = [];
+      for (let i2 = 0; i2 < node.inputs.length; i2++) {
+        if (inputArray[i2] !== void 0) {
+          indices.push(i2);
+        }
+        values[i2] = inputArray[i2];
+      }
+      if (indices.length === 0) {
+        return;
+      }
+      if (this.useIndex) {
+        state.setResolved(node.id, { value: indices, time: state.time });
+      } else {
+        state.setResolved(node.id, { value: values, time: state.time });
+      }
+      return;
+    }
+    for (let i2 = 0; i2 < node.inputs.length; i2++) {
+      const myInput = inputArray[i2];
+      if (myInput !== void 0 && (lastInputArray === void 0 || myInput !== lastInputArray[i2])) {
+        if (this.useIndex) {
+          state.setResolved(node.id, { value: { index: i2, value: myInput }, time: state.time });
+        } else {
+          state.setResolved(node.id, { value: myInput, time: state.time });
+        }
+        return;
+      }
+    }
+  }
+}
+class UserEvent extends Stream {
+  constructor(record, queued) {
+    super(userEventType, false);
+    __publicField(this, "record");
+    __publicField(this, "queued");
+    this.record = record;
+    this.queued = !!queued;
+  }
+  created(state, id) {
+    let oldRecord = state.scratch.get(id);
+    if (oldRecord && oldRecord.cleanup && typeof oldRecord.cleanup === "function") {
+      oldRecord.cleanup();
+      oldRecord.cleanup = void 0;
+    }
+    state.scratch.set(id, this.record);
+    return this;
+  }
+  evaluate(state, node, _inputArray, _lastInputArray) {
+    let newValue;
+    if (this.queued) {
+      newValue = state.getEventValues(state.scratch.get(node.id), state.time);
+    } else {
+      newValue = state.getEventValue(state.scratch.get(node.id), state.time);
+    }
+    if (newValue !== void 0) {
+      if (newValue !== null && newValue.then) {
+        newValue.then((value) => {
+          state.setResolved(node.id, { value, time: state.time });
+        });
+      } else {
+        state.setResolved(node.id, { value: newValue, time: state.time });
+      }
+    }
+  }
+}
+class SendEvent extends Stream {
+  constructor() {
+    super(sendType, false);
+  }
+}
+class ReceiverEvent extends Stream {
+  constructor(options) {
+    const isBehavior = !!(options == null ? void 0 : options.isBehavior);
+    super(receiverType, isBehavior);
+    __publicField(this, "queued");
+    this.queued = !!(options == null ? void 0 : options.queued);
+  }
+  created(_state, _id) {
+    return this;
+  }
+  evaluate(state, node, _inputArray, _lastInputArray) {
+    const value = state.scratch.get(node.id);
+    if (value !== void 0) {
+      state.setResolved(node.id, { value, time: state.time });
+    }
+  }
+  conclude(state, varName) {
+    var _a2;
+    super.conclude(state, varName);
+    if (this[isBehaviorKey]) {
+      return;
+    }
+    if (((_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value) !== void 0) {
+      state.resolved.delete(varName);
+      state.scratch.delete(varName);
+      return varName;
+    }
+    return;
+  }
+}
+class ChangeEvent extends Stream {
+  constructor(value) {
+    super(changeType, false);
+    __publicField(this, "value");
+    this.value = value;
+  }
+  evaluate(state, node, _inputArray, _lastInputArray) {
+    if (this.value === void 0) {
+      return;
+    }
+    if (this.value === state.scratch.get(node.id)) {
+      return;
+    }
+    state.setResolved(node.id, { value: this.value, time: state.time });
+    state.scratch.set(node.id, this.value);
+  }
+}
+class OnceEvent extends Stream {
+  constructor(value) {
+    super(onceType, false);
+    __publicField(this, "value");
+    this.value = value;
+  }
+  ready(node, state) {
+    return state.scratch.get(node.id) === void 0;
+  }
+  evaluate(state, node, _inputArray, _lastInputArray) {
+    state.setResolved(node.id, { value: this.value, time: state.time });
+    state.scratch.set(node.id, this.value);
+  }
+}
+class CollectStream extends Stream {
+  constructor(init, varName, updater, isBehavior) {
+    super(collectType, isBehavior);
+    __publicField(this, "init");
+    __publicField(this, "varName");
+    __publicField(this, "updater");
+    this.init = init;
+    this.varName = varName;
+    this.updater = updater;
+  }
+  created(state, id) {
+    const scratch = state.scratch.get(id);
+    state.streams.set(id, this);
+    if (scratch) {
+      const resolving = scratch.resolving;
+      if (resolving === true || typeof resolving !== "boolean") {
+        return this;
+      }
+    }
+    const initValue = this.init();
+    if (initValue && typeof initValue === "object" && initValue.then) {
+      state.scratch.set(id, { resolving: true });
+      initValue.then((value) => {
+        state.requestAlarm(1);
+        state.scheduleAlarm();
+        state.setResolved(id, { value, time: state.time });
+        state.scratch.set(id, { current: value });
+      });
+      return this;
+    }
+    state.setResolved(id, { value: initValue, time: state.time });
+    state.scratch.set(id, { current: initValue });
+    return this;
+  }
+  evaluate(state, node, inputArray, lastInputArray) {
+    const scratch = state.scratch.get(node.id);
+    if (!scratch) {
+      return;
+    }
+    if (scratch.resolving) {
+      return;
+    }
+    const inputIndex = node.inputs.indexOf(this.varName);
+    const inputValue = inputArray[inputIndex];
+    if (inputValue !== void 0 && (!lastInputArray || inputValue !== lastInputArray[inputIndex])) {
+      const newValue = this.updater(scratch.current, inputValue);
+      if (newValue !== void 0) {
+        if (newValue !== null && newValue.then) {
+          newValue.then((value) => {
+            state.requestAlarm(1);
+            state.scheduleAlarm();
+            state.setResolved(node.id, { value, time: state.time });
+            state.scratch.set(node.id, { current: value });
+          });
+        } else {
+          state.setResolved(node.id, { value: newValue, time: state.time });
+          state.scratch.set(node.id, { current: newValue });
+        }
+      }
+    }
+  }
+}
+class SelectStream extends Stream {
+  constructor(init, varName, updaters, isBehavior) {
+    super(selectType, isBehavior);
+    __publicField(this, "init");
+    __publicField(this, "varName");
+    __publicField(this, "updaters");
+    this.init = init;
+    this.varName = varName;
+    this.updaters = updaters;
+  }
+  created(state, id) {
+    const scratch = state.scratch.get(id);
+    state.streams.set(id, this);
+    if (scratch) {
+      const resolving = scratch.resolving;
+      if (resolving === true || typeof resolving !== "boolean") {
+        return this;
+      }
+    }
+    const initValue = this.init();
+    if (initValue && typeof initValue === "object" && initValue.then) {
+      state.scratch.set(id, { resolving: true });
+      initValue.then((value) => {
+        state.requestAlarm(1);
+        state.scheduleAlarm();
+        state.setResolved(id, { value, time: state.time });
+        state.scratch.set(id, { current: value });
+      });
+      return this;
+    }
+    state.setResolved(id, { value: initValue, time: state.time });
+    state.scratch.set(id, { current: initValue });
+    return this;
+  }
+  evaluate(state, node, inputArray, _lastInputArray) {
+    const scratch = state.scratch.get(node.id);
+    if (scratch === void 0) {
+      return;
+    }
+    if (scratch.resolving) {
+      return;
+    }
+    const inputIndex = node.inputs.indexOf(this.varName);
+    const orRecord = inputArray[inputIndex];
+    if (orRecord !== void 0) {
+      const newValue = this.updaters[orRecord.index](scratch.current, orRecord.value);
+      if (newValue !== void 0) {
+        if (newValue !== null && newValue.then) {
+          newValue.then((value) => {
+            state.requestAlarm(1);
+            state.scheduleAlarm();
+            state.setResolved(node.id, { value, time: state.time });
+            state.scratch.set(node.id, { current: value });
+          });
+        } else {
+          state.setResolved(node.id, { value: newValue, time: state.time });
+          state.scratch.set(node.id, { current: newValue });
+        }
+      }
+    }
+  }
+}
+class GatherStream extends Stream {
+  constructor(regexp, isBehavior) {
+    super(gatherType, isBehavior);
+    __publicField(this, "regexp");
+    this.regexp = new RegExp(regexp);
+  }
+  created(_state, _id) {
+    return this;
+  }
+  evaluate(state, node, inputArray, lastInputArray) {
+    if (state.equals(inputArray, lastInputArray)) {
+      return;
+    }
+    const inputs = node.inputs;
+    const validInputNames = [];
+    const validInputs = [];
+    let hasPromise = false;
+    for (let i2 = 0; i2 < inputs.length; i2++) {
+      const v2 = inputArray[i2];
+      if (v2 !== void 0) {
+        validInputNames.push(inputs[i2]);
+        validInputs.push(v2);
+        if (v2 !== null && v2.then) {
+          hasPromise = true;
+        }
+      }
+    }
+    if (hasPromise) {
+      Promise.all(validInputs).then((values) => {
+        const result = {};
+        for (let i2 = 0; i2 < validInputNames.length; i2++) {
+          result[validInputNames[i2]] = values[i2];
+        }
+        state.setResolved(node.id, { value: result, time: state.time });
+      });
+    } else {
+      const result = {};
+      for (let i2 = 0; i2 < validInputNames.length; i2++) {
+        result[validInputNames[i2]] = validInputs[i2];
+      }
+      state.setResolved(node.id, { value: result, time: state.time });
+    }
+  }
+}
+class ResolvePart extends Stream {
+  constructor(object, isBehavior) {
+    super(resolvePartType, isBehavior);
+    __publicField(this, "promise");
+    __publicField(this, "indices");
+    __publicField(this, "resolved");
+    __publicField(this, "object");
+    this.object = object;
+    if (Array.isArray(this.object)) {
+      const array = this.object;
+      const indices = [...Array(array.length).keys()].filter((i2) => {
+        const elem = this.object[i2];
+        return typeof elem === "object" && elem !== null && elem.then;
+      });
+      const promises = indices.map((i2) => array[i2]);
+      this.promise = Promise.all(promises);
+      this.indices = indices;
+    } else {
+      const keys = Object.keys(this.object).filter((k2) => {
+        const elem = this.object[k2];
+        return typeof elem === "object" && elem !== null && elem.then;
+      });
+      const promises = keys.map((k2) => this.object[k2]);
+      this.promise = Promise.all(promises);
+      this.indices = keys;
+    }
+    this.resolved = false;
+  }
+  created(state, id) {
+    if (!this.resolved) {
+      this.promise.then((values) => {
+        var _a2;
+        const wasResolved = (_a2 = state.resolved.get(id)) == null ? void 0 : _a2.value;
+        if (!wasResolved) {
+          this.resolved = true;
+          state.requestAlarm(1);
+          state.scheduleAlarm();
+          if (Array.isArray(this.object)) {
+            const result = [...this.object];
+            const indices = this.indices;
+            for (let i2 of indices) {
+              result[indices[i2]] = values[i2];
+            }
+            state.setResolved(id, { value: result, time: state.time });
+            return result;
+          } else {
+            const result = { ...this.object };
+            const indices = this.indices;
+            for (let i2 = 0; i2 < indices.length; i2++) {
+              result[indices[i2]] = values[i2];
+            }
+            state.setResolved(id, { value: result, time: state.time });
+            return result;
+          }
+        }
+      });
+    }
+    return this;
+  }
+}
+class GeneratorNextEvent extends Stream {
+  constructor(generator) {
+    super(generatorNextType, false);
+    __publicField(this, "promise");
+    __publicField(this, "generator");
+    const promise = generator.next();
+    this.promise = promise;
+    this.generator = generator;
+  }
+  created(state, id) {
+    if (this.generator.done) {
+      return this;
+    }
+    const promise = this.promise;
+    promise.then((value) => {
+      var _a2;
+      const wasResolved = (_a2 = state.resolved.get(id)) == null ? void 0 : _a2.value;
+      if (!wasResolved) {
+        state.requestAlarm(1);
+        state.scheduleAlarm();
+        state.setResolved(id, { value, time: state.time });
+      }
+    });
+    return this;
+  }
+  conclude(state, varName) {
+    var _a2;
+    const value = (_a2 = state.resolved.get(varName)) == null ? void 0 : _a2.value;
+    if (value !== void 0) {
+      if (!value.done) {
+        if (!this.generator.done) {
+          const promise = this.generator.next();
+          promise.then((value2) => {
+            var _a3;
+            if (this.generator.done) {
+              return;
+            }
+            const wasResolved = (_a3 = state.resolved.get(varName)) == null ? void 0 : _a3.value;
+            if (!wasResolved) {
+              state.requestAlarm(1);
+              state.scheduleAlarm();
+              state.setResolved(varName, { value: value2, time: state.time });
+            }
+          });
+          this.promise = promise;
+        }
+      } else {
+        this.generator.done = true;
+      }
+      super.conclude(state, varName);
+      return varName;
+    }
+    super.conclude(state, varName);
+    return;
   }
 }
 class TSCompiler {
@@ -9631,8 +10051,16 @@ class TSCompiler {
     this.results = /* @__PURE__ */ new Map();
   }
   compile(tsCode, _path) {
-    const compiled = detype(tsCode);
-    return compiled;
+    try {
+      const compiled = detype(tsCode);
+      return compiled;
+    } catch (error) {
+      const e = error;
+      const message = e.message + `: error around -> 
+"${tsCode.slice(e.pos - 30, e.pos + 30)}`;
+      console.log(message);
+      throw error;
+    }
   }
 }
 function translateTS(text2, path2) {
@@ -9648,10 +10076,14 @@ function isGenerator(value) {
   return typeof value === "object" && value.constructor === prototypicalGeneratorFunction.constructor;
 }
 const defaultHandler = (ev) => ev;
-function eventBody(options) {
-  let { forObserve, callback, dom, eventName, eventHandler, state, queued } = options;
+function eventBody(args) {
+  let { forObserve, callback, dom, eventName, eventHandler, state, queued, options } = args;
   let record = { queue: [] };
   let myHandler;
+  let myOptions;
+  if (options) {
+    myOptions = { ...options };
+  }
   let realDom;
   if (typeof dom === "string") {
     realDom = document.querySelector(dom);
@@ -9660,6 +10092,8 @@ function eventBody(options) {
   }
   const notifier = (value) => {
     record.queue.push({ value, time: 0 });
+    state.requestAlarm(1);
+    state.scheduleAlarm();
   };
   if (realDom && !forObserve && eventName) {
     if (eventHandler) {
@@ -9667,19 +10101,26 @@ function eventBody(options) {
         const value = eventHandler(evt);
         if (value !== void 0) {
           record.queue.push({ value, time: 0 });
-          if (state.noTicking) {
-            state.noTickingEvaluator();
-          }
+          state.requestAlarm(1);
+          state.scheduleAlarm();
         }
       };
     } else {
       myHandler = defaultHandler;
     }
     if (myHandler) {
-      realDom.addEventListener(eventName, myHandler);
+      if (myOptions) {
+        realDom.addEventListener(eventName, myHandler, myOptions);
+      } else {
+        realDom.addEventListener(eventName, myHandler);
+      }
     }
     if (eventHandler === null) {
-      realDom.removeEventListener(eventName, myHandler);
+      if (myOptions) {
+        realDom.removeEventListener(eventName, myHandler, myOptions);
+      } else {
+        realDom.removeEventListener(eventName, myHandler);
+      }
     }
   }
   if (forObserve && callback) {
@@ -9705,7 +10146,21 @@ class Events {
     return new Events(state);
   }
   listener(dom, eventName, handler, options) {
-    return eventBody({ type: eventType, forObserve: false, dom, eventName, eventHandler: handler, state: this.programState, queued: !!(options == null ? void 0 : options.queued) });
+    let myOptions;
+    if (options) {
+      myOptions = { ...options };
+      delete myOptions.queued;
+    }
+    const queued = !!(options == null ? void 0 : options.queued);
+    return eventBody({
+      forObserve: false,
+      dom,
+      eventName,
+      eventHandler: handler,
+      state: this.programState,
+      queued,
+      options: myOptions
+    });
   }
   delay(varName, delay) {
     return new DelayedEvent(delay, varName, false);
@@ -9716,27 +10171,43 @@ class Events {
   change(value) {
     return new ChangeEvent(value);
   }
+  once(value) {
+    return new OnceEvent(value);
+  }
   next(generator) {
     return new GeneratorNextEvent(generator);
   }
   or(...varNames) {
-    return new OrEvent(varNames);
+    return new OrStream(varNames, false, false);
+  }
+  some(...varNames) {
+    return new OrStream(varNames, false, true);
+  }
+  _or_index(...varNames) {
+    return new OrStream(varNames, true, false);
   }
   collect(init, varName, updater) {
     return new CollectStream(init, varName, updater, false);
   }
-  /*map<S, T>(varName:VarName, updater: (arg:S) => T) {
-      return new CollectStream(undefined, varName, (_a, b) => updater(b), false);
-  },*/
+  select(_init, ..._pairs) {
+  }
+  _select(init, varName, updaters) {
+    return new SelectStream(init, varName, updaters, false);
+  }
   send(receiver, value) {
     this.programState.registerEvent(receiver, value);
     return new SendEvent();
   }
-  receiver() {
-    return new ReceiverEvent(void 0);
+  receiver(options) {
+    return new ReceiverEvent(options);
   }
   observe(callback, options) {
-    return eventBody({ type: eventType, forObserve: true, callback, state: this.programState, queued: options == null ? void 0 : options.queued });
+    return eventBody({
+      forObserve: true,
+      callback,
+      state: this.programState,
+      queued: options == null ? void 0 : options.queued
+    });
   }
   message(event, data2, directWindow) {
     const isInIframe = window.top !== window;
@@ -9776,10 +10247,22 @@ class Behaviors {
   resolvePart(object) {
     return new ResolvePart(object, true);
   }
-  /*
-  startsWith(init:any, varName:VarName) {
-      return new CollectStream(init, varName, (_old, v) => v, true);
-  }*/
+  select(_init, ..._pairs) {
+  }
+  _select(init, varName, updaters) {
+    return new SelectStream(init, varName, updaters, true);
+  }
+  or(...varNames) {
+    return new OrStream(varNames, false, true);
+  }
+  gather(regexp) {
+    return new GatherStream(regexp, true);
+  }
+  receiver(options) {
+    let args = { ...options };
+    args.isBehavior = true;
+    return new ReceiverEvent(args);
+  }
 }
 function topologicalSort(nodes) {
   let order = [];
@@ -9832,29 +10315,64 @@ function difference(oldSet, newSet) {
   return result;
 }
 class ProgramState {
-  constructor(startTime, app, noTicking) {
+  constructor(startTime, app) {
+    // the program that user set with "setupProgram"
     __publicField(this, "scripts");
-    __publicField(this, "order");
-    __publicField(this, "nodes");
-    __publicField(this, "streams");
-    __publicField(this, "scratch");
-    __publicField(this, "resolved");
-    __publicField(this, "inputArray");
-    __publicField(this, "changeList");
-    __publicField(this, "time");
-    __publicField(this, "startTime");
-    __publicField(this, "evaluatorRunning");
-    __publicField(this, "exports");
-    __publicField(this, "imports");
-    __publicField(this, "updated");
+    // a place where a user program can access additional objects and values via Renkon.app
     __publicField(this, "app");
-    __publicField(this, "noTicking");
+    // the options for evaluate
+    __publicField(this, "options");
+    // topological sort of node names that the evaluator walks through
+    __publicField(this, "order");
+    // the Behavior or Event for each node
+    __publicField(this, "types");
+    // compiled nodes that holds information such as input names and body
+    __publicField(this, "nodes");
+    // a cache, so to speak, to keep the streams of known variations
+    __publicField(this, "streams");
+    // another cache memory for streams to remember additional information
+    __publicField(this, "scratch");
+    // the values for nodes
+    __publicField(this, "resolved");
+    // the memory to check whether the current input values are different from last time
+    __publicField(this, "inputArray");
+    // the buffer to store the values send via "Events.send"
+    __publicField(this, "changeList");
+    // a set of node names that are used in $-dependencies.
+    __publicField(this, "nextDeps");
+    // the current logical time.
+    __publicField(this, "time");
+    // the "physical start time" of this ProgramState instance
+    __publicField(this, "startTime");
+    // indicates that the last evaluation of the program resulted in an error
+    __publicField(this, "errored");
+    // a flag whether any resolved value was updated in an evaluation step
+    __publicField(this, "updated");
+    //  a timer of some kind that will call evaluate() in the later time.
+    __publicField(this, "pendingEvaluation");
+    // user visible meta feature that has the currently evaluating node
+    __publicField(this, "thisNode");
+    // ProgramStates instantiated from the component that is created with "Renkon.component" call
     __publicField(this, "programStates");
-    __publicField(this, "lastReturned");
+    // "key" to subprogram
+    // The nodes of the owns a component, so that a node can trigger recomputation when
+    // a component updates intenally
+    __publicField(this, "hasComponent");
+    // the owning varName to keys
+    // the owner of a component
+    __publicField(this, "componentParent");
+    // indicates that a component updated in an evaluation cycle
+    __publicField(this, "componentUpdated");
+    // a flag to set and reset whether scheduleAlarm should do its work
+    __publicField(this, "noSelfSchedule");
+    __publicField(this, "evaluationAlarm");
+    __publicField(this, "pendingAnimationFrame");
+    __publicField(this, "log");
     __publicField(this, "futureScripts");
     __publicField(this, "breakpoints");
     this.scripts = [];
     this.order = [];
+    this.types = /* @__PURE__ */ new Map();
     this.nodes = /* @__PURE__ */ new Map();
     this.streams = /* @__PURE__ */ new Map();
     this.scratch = /* @__PURE__ */ new Map();
@@ -9862,42 +10380,223 @@ class ProgramState {
     this.inputArray = /* @__PURE__ */ new Map();
     this.time = 0, this.changeList = /* @__PURE__ */ new Map();
     this.startTime = startTime;
-    this.evaluatorRunning = 0;
     this.updated = false;
+    this.evaluationAlarm = [];
+    this.pendingAnimationFrame = false;
+    this.noSelfSchedule = false;
+    this.pendingEvaluation = null;
     this.app = app;
-    this.noTicking = noTicking !== void 0 ? noTicking : false;
+    this.log = (...values) => {
+      console.log(...values);
+    };
+    this.hasComponent = /* @__PURE__ */ new Map();
+    this.componentUpdated = false;
     this.programStates = /* @__PURE__ */ new Map();
     this.breakpoints = /* @__PURE__ */ new Set();
+    this.nextDeps = /* @__PURE__ */ new Set();
   }
-  evaluator() {
-    if (this.noTicking) {
-      return this.noTickingEvaluator();
-    }
-    this.evaluatorRunning = window.requestAnimationFrame(() => this.evaluator());
-    try {
-      this.evaluate(Date.now());
-    } catch (e) {
-      console.error(e);
-      console.log("stopping animation");
-      window.cancelAnimationFrame(this.evaluatorRunning);
-      this.evaluatorRunning = 0;
-    }
-  }
-  noTickingEvaluator() {
-    this.noTicking = true;
-    if (this.evaluatorRunning !== 0) {
+  start() {
+    var _a2, _b2, _c;
+    if ((_a2 = this.options) == null ? void 0 : _a2.once) {
       return;
     }
-    this.evaluatorRunning = setTimeout(() => {
+    if (!((_b2 = this.options) == null ? void 0 : _b2.ticker)) {
+      this.noSelfSchedule = false;
+      this.requestAlarm(1);
+      this.scheduleAlarm();
+      return;
+    }
+    if (this.pendingEvaluation) {
+      return;
+    }
+    if ((_c = this.options) == null ? void 0 : _c.noAnimationFrame) {
+      this.pendingEvaluation = {
+        type: "setInterval",
+        handle: setInterval(() => this.tickingEvaluator(), 16)
+      };
+      return;
+    }
+    this.pendingEvaluation = {
+      type: "animationFrame",
+      handle: requestAnimationFrame(() => {
+        if (this.pendingEvaluation) {
+          this.pendingEvaluation.handle = requestAnimationFrame(() => this.start());
+        }
+        this.tickingEvaluator();
+      })
+    };
+  }
+  stop() {
+    var _a2, _b2;
+    if (!this.pendingEvaluation) {
+      return;
+    }
+    if ((_a2 = this.options) == null ? void 0 : _a2.once) {
+      return;
+    }
+    if (!((_b2 = this.options) == null ? void 0 : _b2.ticker)) {
+      this.noSelfSchedule = true;
+    }
+    if (this.pendingEvaluation.type === "setInterval") {
+      clearInterval(this.pendingEvaluation.handle);
+    } else if (this.pendingEvaluation.type === "animationFrame") {
+      cancelAnimationFrame(this.pendingEvaluation.handle);
+      this.pendingAnimationFrame = false;
+    }
+    this.pendingEvaluation = null;
+  }
+  tickingEvaluator() {
+    if (!this.pendingEvaluation && !this.errored) {
+      this.start();
+      return;
+    }
+    let success;
+    try {
+      this.evaluate(Date.now());
+      success = true;
+    } catch (e) {
+      console.error(e);
+      this.thisNode = void 0;
+      this.errored = e;
+      this.log("stopping animation");
+      this.stop();
+      success = false;
+    }
+    return success;
+  }
+  requestAlarm(timeOffset) {
+    var _a2;
+    if (this.errored) {
+      return;
+    }
+    if (this.componentParent) {
+      this.componentParent.requestAlarm(timeOffset);
+    }
+    if ((_a2 = this.options) == null ? void 0 : _a2.ticker) {
+      return;
+    }
+    const maybeAlarm = this.time + timeOffset;
+    let stored = false;
+    if (this.evaluationAlarm.length > 0 && maybeAlarm < this.evaluationAlarm[0]) {
+      stored = true;
+      this.evaluationAlarm.unshift(maybeAlarm);
+    } else {
+      for (let i2 = 0; i2 < this.evaluationAlarm.length - 1; i2++) {
+        const prev = this.evaluationAlarm[i2];
+        const next = this.evaluationAlarm[i2 + 1];
+        if (maybeAlarm === prev) {
+          stored = true;
+          break;
+        }
+        if (prev < maybeAlarm && maybeAlarm < next) {
+          this.evaluationAlarm.splice(i2 + 1, 0, maybeAlarm);
+          stored = true;
+          break;
+        }
+      }
+    }
+    if (!stored) {
+      this.evaluationAlarm.push(maybeAlarm);
+    }
+  }
+  scheduleAlarm() {
+    var _a2, _b2, _c, _d;
+    const log = (..._args) => {
+    };
+    if (this.componentParent) {
+      this.componentUpdated = true;
+      this.componentParent.scheduleAlarm();
+      return;
+    }
+    if (((_a2 = this.options) == null ? void 0 : _a2.ticker) || ((_b2 = this.options) == null ? void 0 : _b2.once)) {
+      return;
+    }
+    if (this.noSelfSchedule) {
+      return;
+    }
+    const maybeAlarm = this.evaluationAlarm[0];
+    log("schedule", maybeAlarm, this.time, this.evaluationAlarm, this.pendingEvaluation);
+    if (this.errored) {
+      return;
+    }
+    let keptAnimation = false;
+    if (this.pendingEvaluation) {
+      if (this.pendingEvaluation.type === "setTimeout") {
+        clearTimeout(this.pendingEvaluation.handle);
+      } else if (this.pendingEvaluation.type === "animationFrame") {
+        if (maybeAlarm !== void 0 && maybeAlarm - this.time < 20) {
+          keptAnimation = true;
+        } else {
+          this.pendingAnimationFrame = false;
+          log("clear animationframe", this.pendingEvaluation);
+        }
+      }
+      if (!keptAnimation) {
+        this.pendingEvaluation = null;
+      }
+    }
+    if (maybeAlarm === void 0) {
+      return;
+    }
+    if (maybeAlarm - this.time < 20 && ((_c = this.options) == null ? void 0 : _c.noAnimationFrame) !== true) {
+      if (!keptAnimation) {
+        this.pendingAnimationFrame = true;
+        this.pendingEvaluation = {
+          type: "animationFrame",
+          handle: this.scheduler()
+        };
+        log("start animationframe", this.pendingEvaluation);
+      }
+      return;
+    }
+    this.pendingEvaluation = {
+      type: "setTimeout",
+      handle: setTimeout(() => {
+        try {
+          this.evaluate(Date.now());
+        } catch (e) {
+          console.error(e);
+          this.log("stopping animation");
+          this.errored = e;
+          this.thisNode = void 0;
+        }
+      }, maybeAlarm - this.time - (((_d = this.options) == null ? void 0 : _d.noAnimationFrame) ? 0 : 20))
+    };
+  }
+  scheduler() {
+    if (this.pendingAnimationFrame) {
+      const frame = requestAnimationFrame(() => {
+        if (this.pendingAnimationFrame) {
+          this.doEvaluate();
+          this.scheduler();
+        }
+      });
+      return frame;
+    }
+  }
+  doEvaluate() {
+    if (this.evaluationAlarm[0] - this.time < 20) {
       try {
         this.evaluate(Date.now());
-      } finally {
-        this.evaluatorRunning = 0;
+      } catch (e) {
+        console.error(e);
+        this.log("stopping animation");
+        this.errored = e;
+        this.thisNode = void 0;
+        this.pendingAnimationFrame = false;
+        this.pendingEvaluation = null;
       }
-    }, 0);
+    }
   }
-  setupProgram(scripts2) {
+  setupProgram(scriptsArg, path2 = "") {
+    var _a2;
     const invalidatedStreamNames = /* @__PURE__ */ new Set();
+    const scripts = scriptsArg.map((s) => {
+      if (typeof s === "string") {
+        return s;
+      }
+      return s.code;
+    });
     for (const [varName, stream] of this.streams) {
       if (!stream[isBehaviorKey]) {
         const scratch = this.scratch.get(varName);
@@ -9918,29 +10617,45 @@ class ProgramState {
     }
     const jsNodes = /* @__PURE__ */ new Map();
     let id = 0;
-    for (const script of scripts2) {
+    for (let scriptIndex = 0; scriptIndex < scripts.length; scriptIndex++) {
+      const script = scripts[scriptIndex];
       if (!script) {
         continue;
       }
       const nodes = parseJavaScript(script, id, false);
       for (const n2 of nodes) {
         if (jsNodes.get(n2.id)) {
-          console.log(`node "${n2.id}" is defined multiple times`);
+          this.log(`node "${n2.id}" is defined multiple times`);
         }
         jsNodes.set(n2.id, n2);
         id++;
       }
     }
     const translated = [...jsNodes].map(([_id, jsNode]) => ({ id: jsNode.id, code: transpileJavaScript(jsNode) }));
-    const evaluated = translated.map((tr) => this.evalCode(tr));
+    const evaluated = translated.map((tr) => this.evalCode(tr, path2));
+    for (let [id2, node] of jsNodes) {
+      if (node.extraType["gather"]) {
+        const r = node.extraType["gather"];
+        const ev = evaluated.find((evaled) => evaled.id === id2);
+        if (ev) {
+          const ins = evaluated.filter((evaled) => new RegExp(r).test(evaled.id)).map((e) => e.id);
+          ev.inputs = ins;
+        }
+      }
+    }
     const sorted = topologicalSort(evaluated);
     const newNodes = /* @__PURE__ */ new Map();
+    this.nextDeps = /* @__PURE__ */ new Set();
     for (const newNode of evaluated) {
       newNodes.set(newNode.id, newNode);
+      const deps = newNode.inputs.filter((varName) => varName.startsWith("$")).map((varName) => varName.slice(1));
+      for (const dep of deps) {
+        this.nextDeps.add(dep);
+      }
     }
     const unsortedVarnames = difference(new Set(evaluated.map((e) => e.id)), new Set(sorted));
     for (const u2 of unsortedVarnames) {
-      console.log(`Node ${u2} is not going to be evaluated because it is in a cycle or depends on a undefined variable.`);
+      this.log(`Node ${u2} is not going to be evaluated because it is in a cycle or depends on a undefined variable.`);
     }
     const oldVariableNames = new Set(this.order);
     const newVariableNames = new Set(sorted);
@@ -9954,18 +10669,40 @@ class ProgramState {
     }
     this.order = sorted;
     this.nodes = newNodes;
-    this.scripts = scripts2;
+    this.scripts = scripts;
+    this.types = /* @__PURE__ */ new Map();
     for (const nodeId of this.order) {
       const newNode = newNodes.get(nodeId);
       if (invalidatedInput(newNode, invalidatedStreamNames)) {
         this.inputArray.delete(newNode.id);
       }
       if (invalidatedStreamNames.has(nodeId)) {
+        const oldValue = (_a2 = this.resolved.get(nodeId)) == null ? void 0 : _a2.value;
+        if (isGenerator(oldValue)) {
+          oldValue.return();
+        }
         this.resolved.delete(nodeId);
         this.scratch.delete(nodeId);
         this.inputArray.delete(nodeId);
       }
     }
+    this.order.forEach((nodeId) => {
+      const node = this.nodes.get(nodeId);
+      if (!node) {
+        return;
+      }
+      if (node.topType !== "") {
+        this.types.set(nodeId, node.topType);
+        return;
+      }
+      this.types.set(nodeId, "Behavior");
+      for (const input of node.inputs) {
+        if (this.types.get(input) === "Event") {
+          this.types.set(nodeId, "Event");
+          return;
+        }
+      }
+    });
     for (const removed of removedVariableNames) {
       const stream = this.streams.get(removed);
       if (stream) {
@@ -9978,24 +10715,57 @@ class ProgramState {
       const nodeNames = [...this.nodes].map(([id2, _body]) => id2);
       for (const input of node.inputs) {
         if (!nodeNames.includes(this.baseVarName(input))) {
-          console.log(`Node ${varName} won't be evaluated as it depends on an undefined variable ${input}.`);
+          this.log(`Node ${varName} won't be evaluated as it depends on an undefined variable ${input}.`);
         }
       }
     }
+    delete this.errored;
   }
-  updateProgram(scripts2) {
-    this.futureScripts = scripts2;
+  updateProgram(scripts, path2 = "") {
+    if (!this.thisNode) {
+      this.setupProgram(scripts, path2);
+      this.requestAlarm(1);
+      this.scheduleAlarm();
+    } else {
+      this.futureScripts = { scripts, path: path2 };
+    }
+  }
+  findDecls(code) {
+    return findDecls(code);
+  }
+  findDecl(name) {
+    const decls = this.findDecls(this.scripts.join("\n"));
+    const decl = decls.find((d2) => d2.decls.includes(name));
+    if (decl) {
+      return decl.code;
+    }
+  }
+  evaluator(now, options) {
+    var _a2;
+    if (options) {
+      this.options = options;
+    }
+    if ((_a2 = this.options) == null ? void 0 : _a2.ticker) {
+      this.tickingEvaluator();
+      return;
+    }
+    if (this.evaluationAlarm.length === 0) {
+      this.evaluationAlarm.push(-1);
+    }
+    this.evaluate(now);
   }
   evaluate(now) {
     this.time = now - this.startTime;
     this.updated = false;
+    this.prelude();
     let trace;
     if (this.breakpoints.size > 0) {
       trace = [];
     }
     for (let id of this.order) {
-      const node = this.nodes.get(id);
-      if (!this.ready(node)) {
+      this.thisNode = this.nodes.get(id);
+      const componentUpdate = this.componentReady(this.thisNode);
+      if (!this.ready(this.thisNode) && !componentUpdate) {
         continue;
       }
       if (trace) {
@@ -10004,33 +10774,39 @@ class ProgramState {
         }
       }
       const change = this.changeList.get(id);
-      const inputArray = node.inputs.map((inputName) => {
+      const inputArray = this.thisNode.inputs.map((inputName) => {
         var _a2;
         return (_a2 = this.resolved.get(this.baseVarName(inputName))) == null ? void 0 : _a2.value;
       });
+      if (componentUpdate) {
+        inputArray.push(this.time);
+      }
       const lastInputArray = this.inputArray.get(id);
       let outputs;
       if (change === void 0 && this.equals(inputArray, lastInputArray)) {
         outputs = this.streams.get(id);
       } else {
         if (change === void 0) {
-          outputs = node.body.apply(
+          outputs = this.thisNode.body.apply(
             this,
             [...inputArray, this]
           );
         } else {
           this.changeList.delete(id);
-          outputs = new ReceiverEvent(change);
+          if (change !== void 0) {
+            this.setResolved(id, { value: change, time: this.time });
+          }
+          outputs = this.streams.get(id);
         }
         this.inputArray.set(id, inputArray);
         const maybeValue = outputs;
-        if (maybeValue !== void 0 && (maybeValue.then || maybeValue[typeKey])) {
+        if (maybeValue !== void 0 && maybeValue !== null && (maybeValue.then || maybeValue[typeKey])) {
           const ev = maybeValue.then ? new PromiseEvent(maybeValue) : maybeValue;
           const newStream = ev.created(this, id);
           this.streams.set(id, newStream);
           outputs = newStream;
         } else {
-          let newStream = new Behavior();
+          let newStream = this.types.get(id) === "Event" ? new EventStream() : new BehaviorStream();
           this.streams.set(id, newStream);
           if (maybeValue === void 0) {
             continue;
@@ -10049,14 +10825,43 @@ class ProgramState {
         continue;
       }
       if (trace) {
-        trace.push({ id, inputArray, inputs: node.inputs, value: outputs });
+        trace.push({ id, inputArray, inputs: this.thisNode.inputs, value: outputs });
         if (this.breakpoints.has(id)) {
-          console.log(trace);
+          this.log(trace);
         }
       }
       const evStream = outputs;
-      evStream.evaluate(this, node, inputArray, lastInputArray);
+      evStream.evaluate(this, this.thisNode, inputArray, lastInputArray);
     }
+    if (!this.componentParent) {
+      this.conclude();
+    }
+    if (this.futureScripts) {
+      const { scripts, path: path2 } = this.futureScripts;
+      delete this.futureScripts;
+      this.setupProgram(scripts, path2);
+      this.requestAlarm(1);
+    }
+    this.scheduleAlarm();
+    this.thisNode = void 0;
+    return this.updated;
+  }
+  prelude() {
+    let i2 = 0;
+    while (true) {
+      let alarm = this.evaluationAlarm[i2];
+      if (alarm === void 0) {
+        break;
+      }
+      if (alarm >= this.time) {
+        break;
+      }
+      i2++;
+    }
+    this.evaluationAlarm = this.evaluationAlarm.slice(i2, this.evaluationAlarm.length);
+    return i2 !== 0;
+  }
+  conclude() {
     for (let id of this.order) {
       const stream = this.streams.get(id);
       if (!stream) {
@@ -10064,26 +10869,44 @@ class ProgramState {
       }
       stream.conclude(this, id);
     }
-    if (this.futureScripts) {
-      const scripts2 = this.futureScripts;
-      delete this.futureScripts;
-      this.setupProgram(scripts2);
-    }
-    return this.updated;
   }
-  evalCode(arg) {
+  evalCode(arg, path2) {
     const { id, code } = arg;
     const hasWindow = typeof window !== "undefined";
     let body;
+    const p2 = path2 === "" || !path2.endsWith("/") ? path2 : path2.slice(0, -1);
     if (hasWindow) {
-      body = `return ${code} //# sourceURL=${window.location.origin}/node/${id}`;
+      const base2 = window.location.origin === "null" ? window.location.pathname : window.location.origin;
+      body = `return ${code} //# sourceURL=${base2}/${p2}/node/${id}`;
     } else {
-      body = `return ${code} //# sourceURL=/node/${id}`;
+      body = `return ${code} //# sourceURL=/${p2}/node/${id}`;
     }
     let func = new Function("Events", "Behaviors", "Renkon", body);
     let val = func(Events, Behaviors, this);
     val.code = code;
     return val;
+  }
+  componentReady(node) {
+    const set = this.hasComponent.get(node.id);
+    if (set) {
+      for (const key of set) {
+        const subgraph = this.programStates.get(key);
+        if (!subgraph) {
+          return false;
+        }
+        const programState = subgraph.programState;
+        if (!programState) {
+          return false;
+        }
+        if (programState.evaluationAlarm.length === 0) {
+          return false;
+        }
+        if (programState.evaluationAlarm[0] <= this.time) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
   ready(node) {
     const output = node.outputs;
@@ -10154,31 +10977,43 @@ class ProgramState {
     return varName[0] !== "$" ? varName : varName.slice(1);
   }
   registerEvent(receiver, value) {
-    this.changeList.set(receiver, value);
-    if (this.noTicking) {
-      this.noTickingEvaluator();
+    const stream = this.streams.get(receiver);
+    if (!stream) {
+      return;
     }
+    if (stream.queued) {
+      let ary = this.changeList.get(receiver);
+      if (!ary) {
+        ary = [];
+        this.changeList.set(receiver, ary);
+      }
+      ary.push(value);
+    } else {
+      this.changeList.set(receiver, value);
+    }
+    this.requestAlarm(1);
+    this.scheduleAlarm();
   }
   setResolved(varName, value) {
     this.resolved.set(varName, value);
     this.updated = true;
-    if (this.noTicking) {
-      this.noTickingEvaluator();
+    if (this.nextDeps.has(varName)) {
+      this.requestAlarm(1);
     }
   }
   setResolvedForSubgraph(varName, value) {
     this.setResolved(varName, value);
     this.inputArray.set(varName, []);
-    this.streams.set(varName, new Behavior());
+    this.streams.set(varName, new BehaviorStream());
   }
   merge(...funcs) {
-    let scripts2 = this.scripts;
+    let scripts = this.scripts;
     const outputs = [];
     funcs.forEach((func) => {
       const { output } = getFunctionBody(func.toString(), true);
       outputs.push(output);
     });
-    this.setupProgram([...scripts2, ...outputs]);
+    this.updateProgram([...scripts, ...outputs]);
   }
   loadTS(path) {
     let i = 0;
@@ -10195,17 +11030,57 @@ class ProgramState {
       });
     });
   }
-  component(func) {
-    return (input, key) => {
-      let programState = this.programStates.get(key);
-      if (!programState) {
-        programState = new ProgramState(this.time);
-        programState.lastReturned = void 0;
-        this.programStates.set(key, programState);
+  component(argFunc) {
+    if (typeof argFunc === "function") {
+      const maybeString = argFunc.toString();
+      const translated = maybeString.includes("Events.create(Renkon)") || maybeString.includes("Behaviors.create(Renkon)");
+      if (translated) {
+        const decl = this.findDecl(argFunc.name);
+        if (decl) {
+          argFunc = decl;
+        }
       }
-      const { params, returnArray, output } = getFunctionBody(func.toString(), false);
-      const receivers = params.map((r) => `const ${r} = undefined;`).join("\n");
-      programState.setupProgram([receivers, output]);
+    }
+    const func = typeof argFunc === "string" ? Function(`return ` + argFunc)() : argFunc;
+    const funcString = typeof argFunc === "string" ? argFunc : argFunc.toString();
+    let lastReturned;
+    return (input, key) => {
+      if (key === void 0) {
+        console.log("the second argument key has to be specified");
+      }
+      let programState;
+      let returnValues = null;
+      let newProgramState = false;
+      let subProgramState = this.programStates.get(key);
+      if (!subProgramState) {
+        newProgramState = true;
+        programState = new ProgramState(this.time);
+        programState.componentParent = this;
+      } else {
+        programState = subProgramState.programState;
+        returnValues = subProgramState.outputNames;
+      }
+      const maybeOldFunc = subProgramState == null ? void 0 : subProgramState.funcString;
+      if (newProgramState || funcString !== maybeOldFunc) {
+        let { params, types: types2, returnValues: rs, output } = getFunctionBody(funcString, false);
+        returnValues = rs;
+        const receivers = params.map((r) => `const ${r} = ${(types2 == null ? void 0 : types2.get(r)) === "Behavior" ? "Behaviors" : "Events"}.receiver();`).join("\n");
+        programState.setupProgram([receivers, output], func.name);
+        this.programStates.set(key, { programState, funcString, outputNames: returnValues });
+        if (this.thisNode === void 0) {
+          console.log("a component is created outside of a node definition");
+        } else {
+          let set = this.hasComponent.get(this.thisNode.id);
+          if (!set) {
+            set = /* @__PURE__ */ new Set();
+            this.hasComponent.set(this.thisNode.id, set);
+          }
+          if (set.has(key)) {
+            console.log("the same key is specified for multiple component instances");
+          }
+          set.add(key);
+        }
+      }
       const trigger = (input2) => {
         for (let key2 in input2) {
           programState.setResolvedForSubgraph(
@@ -10213,80 +11088,42 @@ class ProgramState {
             { value: input2[key2], time: this.time }
           );
         }
-        programState.evaluate(this.time);
-        const result = {};
+        programState.componentUpdated = false;
+        programState.evaluator(this.time, { once: true });
+        let result = void 0;
         const resultTest = [];
-        if (returnArray) {
-          for (const n2 of returnArray) {
-            const v2 = programState.resolved.get(n2);
-            resultTest.push(v2 ? v2.value : void 0);
-            if (v2 && v2.value !== void 0) {
-              result[n2] = v2.value;
+        let resultTypeBehavior = true;
+        if (returnValues) {
+          if (Array.isArray(returnValues)) {
+            console.log("arrayform is no longer supported");
+          } else {
+            for (const k2 of Object.keys(returnValues)) {
+              const v2 = programState.resolved.get(returnValues[k2]);
+              resultTest.push(v2 ? v2.value : void 0);
+              resultTypeBehavior = resultTypeBehavior && programState.types.get(returnValues[k2]) === "Behavior";
+              if (v2 && v2.value !== void 0) {
+                if (result === void 0) {
+                  result = {};
+                }
+                result[k2] = v2.value;
+              }
             }
           }
-          return result;
+          if (programState.componentUpdated) {
+            this.requestAlarm(1);
+            this.scheduleAlarm();
+          }
         }
-        return {};
+        programState.conclude();
+        const equals = programState.equals(lastReturned, resultTest);
+        lastReturned = resultTest;
+        if (resultTypeBehavior && equals) {
+          return void 0;
+        }
+        return result;
       };
       return trigger(input);
     };
-  }
-  renkonify(func, optSystem) {
-    const programState = new ProgramState(0, optSystem);
-    const { params, returnArray, output } = getFunctionBody(func.toString(), false);
-    const self = this;
-    const receivers = params.map((r) => `const ${r} = undefined;`).join("\n");
-    programState.setupProgram([receivers, output]);
-    function generator(params2) {
-      const gen = renkonBody(params2);
-      gen.done = false;
-      return Events.create(self).next(gen);
-    }
-    async function* renkonBody(args) {
-      let lastYielded = void 0;
-      for (let key in args) {
-        programState.setResolvedForSubgraph(
-          key,
-          { value: args[key], time: self.time }
-        );
-      }
-      while (true) {
-        programState.evaluate(self.time);
-        const result = {};
-        const resultTest = [];
-        if (returnArray) {
-          for (const n2 of returnArray) {
-            const v2 = programState.resolved.get(n2);
-            resultTest.push(v2 ? v2.value : void 0);
-            if (v2 && v2.value !== void 0) {
-              result[n2] = v2.value;
-            }
-          }
-        }
-        yield !self.equals(lastYielded, resultTest) ? result : void 0;
-        lastYielded = resultTest;
-      }
-    }
-    return generator;
-  }
-  evaluateSubProgram(programState, params) {
-    for (let key in params) {
-      programState.registerEvent(key, params[key]);
-    }
-    programState.evaluate(this.time);
-    if (!programState.updated) {
-      return void 0;
-    }
-    const result = {};
-    if (programState.exports) {
-      for (const n2 of programState.exports) {
-        const v2 = programState.resolved.get(n2);
-        if (v2 && v2.value !== void 0) {
-          result[n2] = v2.value;
-        }
-      }
-    }
-    return result;
   }
   spaceURL(partialURL) {
     if (/^http(s)?:\/\//.test(partialURL)) {
@@ -10311,6 +11148,9 @@ class ProgramState {
   }
   resetBreakpoint() {
     this.breakpoints = /* @__PURE__ */ new Set();
+  }
+  setLog(func) {
+    this.log = func;
   }
 }
 function transpileJSX(code) {
@@ -10392,6 +11232,7 @@ function rewriteJSX(body, code) {
 }
 export {
   ProgramState,
+  globals,
   parseJSX,
   translateTS,
   transpileJSX,
