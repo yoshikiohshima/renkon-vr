@@ -28,9 +28,10 @@ class ToolCallTriggerPawn extends PawnBehavior {
     onPointerDown(p3d) {
         let avatar = this.getMyAvatar();
         this.triggerWorld.toolCallTarget = this;
-        console.log("toolCallTarget", this.triggerWorld, this);
+        let text = this.textField.actor.doc.plainText();
+        console.log("toolCallTarget", this.triggerWorld, text);
         avatar.addFirstResponder("pointerUp", {}, this);
-        this.publish(this.triggerWorld.id, "startTranscription", this.id);
+        this.publish(this.triggerWorld.id, "startTranscription", {id: this.id, text});
     }
 
     onPointerUp(p3d) {

@@ -43,9 +43,9 @@ class ToolCallWorldPawn extends PawnBehavior {
         });
     }
 
-    startTranscription(id) {
+    startTranscription(data) {
         if (!this.programState) {return;}
-        this.programState.registerEvent("click", id);
+        this.programState.registerEvent("request", data);
     }
 }
 

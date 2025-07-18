@@ -15,6 +15,7 @@ class TextCommandInterpreterPawn extends PawnBehavior {
 
     editCommand(data) {
         console.log("editCommand", data);
+        if (!data) {return;}
         let command = data.name;
         let args = JSON.parse(data.arguments);
         if (!command) return;
@@ -24,6 +25,15 @@ class TextCommandInterpreterPawn extends PawnBehavior {
         if (command === "cursorNextLine") {
             let arg = args.arg;
             this.warota.handleKey(user, 40, false, false, arg);
+            this.changed(true); // this calls "changed" of TextFieldPawn
+        }
+        if (command === "cursorPrevLine") {
+            let arg = args.arg;
+            this.warota.handleKey(user, 38, false, false, arg);
+            this.changed(true); // this calls "changed" of TextFieldPawn
+        }
+        if (command === "deleteSelection") {
+            this.warota.delete(user, true);
             this.changed(true); // this calls "changed" of TextFieldPawn
         }
         if (command === "typeIn") {
@@ -43,6 +53,17 @@ class TextCommandInterpreterPawn extends PawnBehavior {
                 this.changed(true); // this calls "changed" of TextFieldPawn
             }
         }
+        if (command === "replaceAll") {
+            let original = args.original;
+            let replacement = args.replacement;
+
+            console.log(original, replacement);
+            let text = this.warota.doc.plainText();
+
+            let newText = text.replaceAll(original, replacement);
+            this.say("load", [{text: newText}]);
+            this.changed(true); // this calls "changed" of TextFieldPawn
+        }
     }
 }
 
@@ -54,4 +75,3 @@ export default {
         }
     ]
 }
-

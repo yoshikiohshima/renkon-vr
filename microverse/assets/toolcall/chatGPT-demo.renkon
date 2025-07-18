@@ -5,32 +5,32 @@
 "type":"move",
 "width":521.4537587766198,
 "x":783.6655685591804,
-"y":-335.5132067011916}],["66",{"height":568.4863273346001,
+"y":-335.5132067011916}],["66",{"height":496.90971755539135,
 "id":"66",
-"type":"resize",
-"width":520.4457076228296,
-"x":249.42168855975677,
-"y":71.87959944254219}],["72",{"height":321.52829956252793,
+"type":"move",
+"width":480.5077435190265,
+"x":252.14803471014815,
+"y":380.4779276714009}],["72",{"height":321.52829956252793,
 "id":"72",
 "type":"resize",
 "width":469.7857499866088,
 "x":250.36299839580352,
-"y":-360.4236415635852}],["78",{"height":1613.8390505575894,
+"y":-360.4236415635852}],["78",{"height":1585.0169610154924,
 "id":"78",
 "type":"resize",
-"width":828.2576336200782,
+"width":686.1468405309279,
 "x":-583.1546329450454,
-"y":-357.4676754222469}],["79",{"height":474.9120824276621,
+"y":-357.4676754222469}],["79",{"height":658.6374807120941,
 "id":"79",
-"type":"move",
-"width":695.20989790569,
-"x":931.326112880443,
-"y":-139.65626787799374}],["82",{"height":177.44249260494198,
-"id":"82",
 "type":"resize",
-"width":835.0604670114599,
-"x":777.8816470923539,
-"y":490.5781212440274}]]}},
+"width":760.6879784086187,
+"x":822.6782117879162,
+"y":-129.4976214683553}],["82",{"height":158.45329120083736,
+"id":"82",
+"type":"move",
+"width":731.8151415625396,
+"x":814.5502072377624,
+"y":556.7560370369254}]]}},
 "titles":{"map":{"__map":true,
 "values":[["65",{"id":"65",
 "state":false,
@@ -58,7 +58,7 @@
 "values":[["65","code"],["66","code"],["72","code"],["78","code"],["79","code"],["82","code"]]}},
 "windows":["65","66","72","78","79","82"],
 "zIndex":{"map":{"__map":true,
-"values":[["65",111],["66",101],["72",114],["78",106],["79",117],["82",116]]}}}
+"values":[["65",111],["66",116],["72",114],["78",106],["79",101],["82",117]]}}}
 {__codeMap: true, value: [[`65`, `const apiKey = new URL(window.top.location).searchParams.get("apiKey");
 `],
 [`66`, `const recognition = (() => {
@@ -76,13 +76,12 @@ const transcript = Events.observe((notify) => {
   return () => {delete recognition.onresult}
 });
 
-
-const click = Events.receiver();
-const transcriptionTarget = Behaviors.keep(click);
+const request = Events.receiver();
+const transcriptionTarget = Behaviors.keep(request);
 
 (() => {
   recognition.start();
-})(click)
+})(request)
 
 console.log(transcript[0][0].transcript);
 
@@ -186,7 +185,7 @@ const click = Events.listener(init, "click", evt => evt);
   }
 ]
 `],
-[`79`, `const apiResult = ((transcript) => {
+[`79`, `const apiResult = ((transcript, transcriptionTarget) => {
   return fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -196,21 +195,31 @@ const click = Events.listener(init, "click", evt => evt);
     body: JSON.stringify({
       model: "gpt-4-0613",  // or newer
       messages: [
-        { role: "system", content: "You convert voice commands to editor function calls." },
-        { role: "user", content: transcript[0][0].transcript }
+        {
+          role: "system",
+          content: \`You are a code editing assistant. Use the current editor content to make decisions about numeric values, string formats, etc.\`
+        },
+        {
+          role: "user",
+          content: \`Editor content: """\${transcriptionTarget.text}"""\`,
+        },
+        {
+          role: "user",
+          content: transcript[0][0].transcript
+        }
       ],
       functions: textEditFunctions,
       function_call: "auto",
       temperature: 0,
     }),
   }).then((res) => res.json());
-})(transcript);
+})(transcript, transcriptionTarget);
 
 const data = Events.change(apiResult);
 console.log("call", data.choices[0].message.function_call);
 `],
 [`82`, `const _publish = ((functionCall, transcriptionTarget) => {
   console.log(functionCall, transcriptionTarget);
-  console.log(transcriptionTarget, "functionCall", data.choices[0].message.function_call);
-  Renkon.app.publish(transcriptionTarget, "functionCall", data.choices[0].message.function_call);
+  console.log(transcriptionTarget.id, "functionCall", data.choices[0].message.function_call);
+  Renkon.app.publish(transcriptionTarget.id, "functionCall", data.choices[0].message.function_call);
 })(data.choices[0].message.function_call, transcriptionTarget);`]]}
