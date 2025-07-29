@@ -4,33 +4,43 @@
 "id":"65",
 "type":"move",
 "width":521.4537587766198,
-"x":783.6655685591804,
-"y":-335.5132067011916}],["66",{"height":496.90971755539135,
+"x":837.5180227592132,
+"y":-300.20712031579137}],["66",{"height":496.90971755539135,
 "id":"66",
 "type":"move",
 "width":480.5077435190265,
-"x":252.14803471014815,
-"y":380.4779276714009}],["72",{"height":321.52829956252793,
+"x":232.67926210291859,
+"y":64.54781681653134}],["72",{"height":280.17614717568415,
 "id":"72",
 "type":"resize",
-"width":469.7857499866088,
+"width":466.9028675783667,
 "x":250.36299839580352,
 "y":-360.4236415635852}],["78",{"height":1585.0169610154924,
 "id":"78",
 "type":"resize",
 "width":686.1468405309279,
 "x":-583.1546329450454,
-"y":-357.4676754222469}],["79",{"height":658.6374807120941,
+"y":-357.4676754222469}],["79",{"height":664.1307206765398,
 "id":"79",
 "type":"resize",
-"width":760.6879784086187,
+"width":837.5698562506236,
 "x":822.6782117879162,
 "y":-129.4976214683553}],["82",{"height":158.45329120083736,
 "id":"82",
 "type":"move",
 "width":731.8151415625396,
-"x":814.5502072377624,
-"y":556.7560370369254}]]}},
+"x":843.7002420084189,
+"y":576.3474804951286}],["83",{"height":810.3807317455451,
+"id":"83",
+"type":"move",
+"width":835.365369561029,
+"x":1687.8750695206463,
+"y":-110.48074161516558}],["88",{"height":337.447925617569,
+"id":"88",
+"type":"move",
+"width":563.1150314472407,
+"x":1056.2812043717402,
+"y":765.8167141341974}]]}},
 "titles":{"map":{"__map":true,
 "values":[["65",{"id":"65",
 "state":false,
@@ -44,6 +54,10 @@
 "state":false,
 "title":"request"}],["82",{"id":"82",
 "state":false,
+"title":"untitled"}],["83",{"id":"83",
+"state":false,
+"title":"untitled"}],["88",{"id":"88",
+"state":false,
 "title":"untitled"}]]}},
 "version":2,
 "windowEnabled":{"map":{"__map":true,
@@ -53,12 +67,14 @@
 "id":"72"}],["78",{"enabled":true,
 "id":"78"}],["79",{"enabled":true,
 "id":"79"}],["82",{"enabled":true,
-"id":"82"}]]}},
+"id":"82"}],["83",{"enabled":false,
+"id":"83"}],["88",{"enabled":false,
+"id":"88"}]]}},
 "windowTypes":{"map":{"__map":true,
-"values":[["65","code"],["66","code"],["72","code"],["78","code"],["79","code"],["82","code"]]}},
-"windows":["65","66","72","78","79","82"],
+"values":[["65","code"],["66","code"],["72","code"],["78","code"],["79","code"],["82","code"],["83","code"],["88","code"]]}},
+"windows":["65","66","72","78","79","82","83","88"],
 "zIndex":{"map":{"__map":true,
-"values":[["65",111],["66",116],["72",114],["78",106],["79",101],["82",117]]}}}
+"values":[["65",117],["66",121],["72",114],["78",106],["79",101],["82",116],["83",111],["88",119]]}}}
 {__codeMap: true, value: [[`65`, `const apiKey = new URL(window.top.location).searchParams.get("apiKey");
 `],
 [`66`, `const recognition = (() => {
@@ -97,8 +113,7 @@ console.log(transcript[0][0].transcript);
   return button;
 })();
 
-
-const click = Events.listener(init, "click", evt => evt);
+const request = Events.listener(init, "click", evt => evt);
 `],
 [`78`, `const textEditFunctions = [
   {
@@ -197,7 +212,7 @@ const click = Events.listener(init, "click", evt => evt);
       messages: [
         {
           role: "system",
-          content: \`You are a code editing assistant. Use the current editor content to make decisions about numeric values, string formats, etc.\`
+          content: \`You are a code editing assistant. Use the current editor content to make decisions about numeric values, string formats, etc. For example, if the code text has a number written as numeric like "3", and the user search for "three", the response should be "searchFor("3")"\`
         },
         {
           role: "user",
@@ -222,4 +237,48 @@ console.log("call", data.choices[0].message.function_call);
   console.log(functionCall, transcriptionTarget);
   console.log(transcriptionTarget.id, "functionCall", data.choices[0].message.function_call);
   Renkon.app.publish(transcriptionTarget.id, "functionCall", data.choices[0].message.function_call);
-})(data.choices[0].message.function_call, transcriptionTarget);`]]}
+})(data.choices[0].message.function_call, transcriptionTarget);`],
+[`83`, `const init = (() => {
+  let button = document.body.querySelector("#button");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "button";
+    document.body.appendChild(button);
+    button.textContent = "listen"
+  }
+  return button;
+})();
+
+const request = Events.listener(init, "click", evt => evt);
+
+const index = Behaviors.collect(undefined, request, (prev, req) => prev === undefined ? 0 : prev + 1);
+
+const commandExamples = [
+
+  {userRequest: "search for five", editorContent: "there were 5 sheep and 10 chickens", solution: \`searchFor("5")\`},
+  {userRequest: "search for 10", editorContent: " ", solution: \`searchFor("10")\`},
+  {userRequest: "go up three lines", editorContent: "line 1\\nline 2\\nline 3\\nline 4\\nline 5", solution: \`cursorPrevLine(3)\`},
+];
+
+const obj = commandExamples[index];
+
+
+
+const transcript = [[{transcript: obj.userRequest}]];
+const transcriptionTarget = {text: obj.editorContent};`],
+[`88`, `
+const commandExamples = [
+  {userRequest: "search for ten", editorContent: "there were 8 sheep and 10 chickens", solution: \`searchFor("10")\`},
+  {userRequest: "enter the text const x equals ten semicolon", editorContent: " ", solution: \`typeIn("const x = 10;")\`},
+  {userRequest: "next line", editorContent: "first line\\nsecond line", solution: \`cursorNextLine(1)\`},
+  {userRequest: "search for abc", editorContent: " ", solution: \`searchFor("abc")\`},
+  {userRequest: "type in abc", editorContent: " ", solution: \`typeIn("abc")\`},
+  {userRequest: "search for five", editorContent: "there were 5 sheep and 10 chickens", solution: \`searchFor("5")\`},
+  {userRequest: "search for 10", editorContent: " ", solution: \`searchFor("10")\`},
+  {userRequest: "type hello world", editorContent: " ", solution: \`typeIn("hello world")\`},
+  {userRequest: "go up 3 lines", editorContent: "line 1\\nline 2\\nline 3\\nline 4\\nline 5", solution: \`cursorPrevLine(3)\`},
+  {userRequest: "find the word function", editorContent: "function myFunction() {\\n  return true;\\n}", solution: \`searchFor("function")\`},
+  {userRequest: "look for the string my variable", editorContent: "let myvariable = 'test';", solution: \`searchFor("myvariable")\`},
+  {userRequest: "down 3", editorContent: "1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n11", solution: \`cursorNextLine(3)\`},
+  {userRequest: "enter the text const z equals four plus one semicolon", editorContent: " ", solution: \`typeIn("const z = 4 + 1;")\`},
+];`]]}
